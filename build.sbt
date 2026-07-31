@@ -68,7 +68,7 @@ val chekhovBrowserSetup: StepContext => List[Step] = _ =>
       name = Some("npm ci (ascent fixture)"),
       run = Some("npm ci --prefix examples/ascent-fixture"),
     ),
-    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH via capability / cache-rehydrate env)
+    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH via zipxEnv)
     // so they ride the zipx LocalDir "Cache sbt" key (path already includes `target`).
     Step(
       name = Some("Install Playwright browsers"),
@@ -89,21 +89,18 @@ zipxScalaSteward     := true
 zipxTestTask         := ciVerify
 // LocalDir: after merge, skip full Verify but emit cache-rehydrate so main gets an
 // actions/cache save later PRs can restore. Browser setup on rehydrate (0.1.2+);
-// path on Verify + rehydrate only (not zipxEnv: reusable-workflow jobs cannot take env).
+// path on zipxEnv (0.1.3+ omits env from reusable-workflow callers like ZipxDocs).
 zipxCacheRehydrateOnMerge    := true
 zipxCacheRehydrateTask       := "compile"
 zipxCacheRehydrateExtraSteps := chekhovBrowserSetup
-zipxCacheRehydrateEnv := Map(
+zipxEnv := Map(
   "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
 )
 
 zipxCapabilities += Capability.test.copy(
   command = _ => ciVerify,
   extraSteps = chekhovBrowserSetup,
-  env = Map(
-    "CHEKHOV_E2E"              -> EnvValue.plain("1"),
-    "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
-  ),
+  env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
