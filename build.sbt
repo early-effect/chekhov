@@ -51,7 +51,7 @@ val ciVerify =
   "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
 zipxTestTask := ciVerify
 
-val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
+val chekhovBrowserSetup: StepContext => List[Step] = _ =>
   List(
     Step(
       name = Some("Set up Node"),
@@ -73,19 +73,13 @@ val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
       name = Some("npm ci (ascent fixture)"),
       run = Some("npm ci --prefix examples/ascent-fixture"),
     ),
-    Step(
-      name = Some("Cache Playwright browsers"),
-      uses = Some(ctx.actions.cache),
-      `with` = ListMap(
-        "path"         -> "~/.cache/ms-playwright",
-        "key"          -> "${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}",
-        "restore-keys" -> "${{ runner.os }}-playwright-",
-      ),
-    ),
+    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH on the job)
+    // so they ride the zipx LocalDir "Cache sbt" key (path already includes `target`).
     Step(
       name = Some("Install Playwright browsers"),
       run = Some(
         """|set -euo pipefail
+           |mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
            |chmod +x ./scripts/install-browsers.sh
            |./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
            |echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
@@ -97,7 +91,11 @@ val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
 zipxCapabilities += Capability.test.copy(
   command = _ => ciVerify,
   extraSteps = chekhovBrowserSetup,
-  env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
+  env = Map(
+    "CHEKHOV_E2E"              -> EnvValue.plain("1"),
+    // Same actions/cache entry as zipx LocalDir (includes `target`); no separate Playwright key.
+    "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
+  ),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
@@ -285,13 +283,12 @@ lazy val dom = (project in file("dom"))
       val enabled =
         sys.env.get("CHEKHOV_E2E").contains("1") ||
           sys.props.get("chekhov.e2e").contains("1")
-      if (enabled) then {
-        (Test / definedTests).value
-      }
+      if enabled then (Test / definedTests).value
       else
         streams.value.log.info("chekhov-dom tests skipped (set CHEKHOV_E2E=1 or -Dchekhov.e2e=1)")
-      Seq.empty
+        Seq.empty
     },
+    // Monorepo only: load ChekhovJSEnv via classpath file (consumers use chekhovJSEnv / ChekhovJSEnv()).
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
@@ -335,7 +332,8 @@ lazy val `jsenv-smoke` = (project in file("examples/jsenv-smoke"))
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
     ),
     Test / mainClass := None,
-    Test / jsEnv     := Def.uncached {
+    // Monorepo only: see ChekhovJsEnvBridge. Consumers: Test / jsEnv := ChekhovJSEnv().
+    Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
     },
@@ -343,6 +341,7 @@ lazy val `jsenv-smoke` = (project in file("examples/jsenv-smoke"))
 
 lazy val `sbt-chekhov` = (project in file("sbt-chekhov"))
   .enablePlugins(SbtPlugin)
+  .dependsOn(jsenv)
   .settings(
     name := "sbt-chekhov",
     scalacOptions ++= commonScalacOptions,

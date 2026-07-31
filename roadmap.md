@@ -157,9 +157,16 @@ Still curated (not generated from YAML field lists):
 
 ### Next
 
-- Publish-friendly `Test / jsEnv := ChekhovJSEnv()` once consumers depend on `chekhov-jsenv` (bridge used in-repo for smoke)
-- Document ESM / `Input.ESModule` requirements for consuming projects
+- Document ESM / `Input.ESModule` requirements for consuming projects (see README JSEnv)
 - Harden console capture via `RunConfig.onOutputStream`
+
+### Publish-friendly JSEnv
+
+**Status: Done (MVP)**
+
+- `ChekhovJSEnv.apply` / `create()` for reflective load
+- `sbt-chekhov` depends on `chekhov-jsenv` and exposes `chekhovJSEnv` (`Test / jsEnv := chekhovJSEnv.value`)
+- In-repo `ChekhovJsEnvBridge` remains monorepo-only for `jsenv-smoke` / `dom`
 
 ---
 
@@ -188,14 +195,16 @@ Still curated (not generated from YAML field lists):
 ### Done
 
 - Artifact dir defaults under `target/chekhov`
-- Specular `GettingStarted` stub; zipx capability hooks in `build.sbt`
+- Specular docs site (`docs/specularSite`) + EE theme; Pages at earlyeffect.rocks/chekhov
+- Hub catalog entry (`catalog-urls.txt` → earlyeffect.rocks)
 - `Page.screenshot` + `ChekhovSuite.screenshotOnFailure` (PNG under `artifactsDir/failures`)
+- Publish-friendly `chekhovJSEnv` via `sbt-chekhov` (see Phase 2)
 
 ### Next
 
 - Traces / video under `artifactsDir`
-- Specular docs site + hub `metadata.json` for earlyeffect.rocks
-- Publish-friendly `jsEnv := ChekhovJSEnv()`; README polish
+- First `v*` Central release (clears docs `0.0.0-ci` / `v<version>` display)
+- README polish as the surface grows
 
 ---
 
@@ -223,6 +232,7 @@ Still curated (not generated from YAML field lists):
 
 ## Suggested near-term order
 
-1. Phase 4 hub + publish hardening (incl. publish-friendly `jsEnv := ChekhovJSEnv()`)
-2. Optional `chekhov-ascent` / JSEnv component suite in the ascent repo
-3. Grow allowlist further as hub apps need it (IndexedDB-heavy paths already via `storageState(indexedDB = true)`)
+1. First `v*` Central publish + docs regen (fix install chrome version)
+2. Traces / video under `artifactsDir`
+3. Optional `chekhov-ascent` / JSEnv component suite in the ascent repo
+4. Grow allowlist further as hub apps need it (IndexedDB-heavy paths already via `storageState(indexedDB = true)`)

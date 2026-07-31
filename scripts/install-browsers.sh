@@ -6,7 +6,8 @@
 # case (or when CHEKHOV_BROWSER_INSTALL=curl) we curl + ditto/unzip instead.
 #
 # Cursor agent shells may inject PLAYWRIGHT_BROWSERS_PATH into an ephemeral sandbox
-# cache; we always clear that so install/run agree on the OS default cache.
+# cache; clear only those overrides so install/run agree. Intentional paths (CI puts
+# browsers under target/ so they ride the zipx LocalDir sbt cache key) are kept.
 #
 # Usage:
 #   ./scripts/install-browsers.sh
@@ -15,7 +16,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-unset PLAYWRIGHT_BROWSERS_PATH || true
+case "${PLAYWRIGHT_BROWSERS_PATH:-}" in
+  "" | 0 | *cursor-sandbox-cache*) unset PLAYWRIGHT_BROWSERS_PATH || true ;;
+esac
 unset PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD || true
 
 BROWSERS=("$@")

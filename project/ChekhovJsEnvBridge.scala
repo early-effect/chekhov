@@ -8,7 +8,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import scala.util.control.NonFatal
 
-/** Lazy JSEnv for build.sbt: loads `chekhov.jsenv.ChekhovJSEnv` from a classpath file written by a task. */
+/** Lazy JSEnv for this monorepo's build.sbt only.
+  *
+  * Loads `chekhov.jsenv.ChekhovJSEnv` from a classpath file written by `writeJsenvClasspath`. Published consumers
+  * should depend on `chekhov-jsenv` (or `sbt-chekhov`) and use `Test / jsEnv := ChekhovJSEnv()` / `chekhovJSEnv.value`
+  * instead.
+  */
 final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
 
   val name: String = "ChekhovJsEnvBridge"
@@ -26,7 +31,7 @@ final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
       throw new IllegalStateException(
         s"Missing ${classpathFile.getAbsolutePath}. Run the jsenv classpath task before jsenv-smoke tests."
       )
-    val urls = readClasspath(classpathFile.toPath)
+    val urls   = readClasspath(classpathFile.toPath)
     val parent = classOf[JSEnv].getClassLoader
     val cl     = new URLClassLoader(urls.toArray, parent)
     try
@@ -35,6 +40,7 @@ final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
     catch
       case NonFatal(e) =>
         throw new IllegalStateException(s"Failed to load ChekhovJSEnv from $classpathFile", e)
+  end load
 
   private def readClasspath(path: Path): Seq[URL] =
     val raw = Files.readString(path, StandardCharsets.UTF_8).trim
@@ -50,7 +56,7 @@ end ChekhovJsEnvBridge
 object ChekhovJsEnvBridge:
   /** Failed run when E2E is disabled (keeps `sbt test` green without browsers). */
   def ignored(reason: String): JSEnv = new JSEnv:
-    val name = s"ChekhovJsEnvBridge(ignored: $reason)"
+    val name                                                  = s"ChekhovJsEnvBridge(ignored: $reason)"
     def start(input: Seq[Input], runConfig: RunConfig): JSRun =
       JSRun.failed(new RuntimeException(name))
     def startWithCom(input: Seq[Input], runConfig: RunConfig, onMessage: String => Unit): JSComRun =

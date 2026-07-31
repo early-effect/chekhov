@@ -32,17 +32,23 @@ This is a **multi-module toolkit**: pick the artifacts you need (`chekhov-core`,
         CodeSnippet(
           "Suite stack (JVM)",
           s"""libraryDependencies ++= Seq(
-  "${m.organization}" %% "chekhov-zio-test" % "${m.version}",
-  "${m.organization}" %% "chekhov-driver"   % "${m.version}",
+  "${m.organization}" %% "chekhov-zio-test" % "${m.version}" % Test,
+  "${m.organization}" %% "chekhov-driver"   % "${m.version}" % Test,
 )""",
+        ),
+        CodeSnippet(
+          "Scala.js DOM + JSEnv",
+          s"""// project/plugins.sbt
+addSbtPlugin("${m.organization}" % "sbt-chekhov" % "${m.version}")
+
+// build.sbt
+libraryDependencies += "${m.organization}" %%% "chekhov-dom" % "${m.version}" % Test
+Test / jsEnv := chekhovJSEnv.value
+""",
         ),
         CodeSnippet(
           "Core algebras only",
           s"""libraryDependencies += "${m.organization}" %% "chekhov-core" % "${m.version}"""",
-        ),
-        CodeSnippet(
-          "Scala.js DOM helpers",
-          s"""libraryDependencies += "${m.organization}" %%% "chekhov-dom" % "${m.version}"""",
         ),
       ),
       brand = Some(

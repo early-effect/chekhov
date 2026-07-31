@@ -17,6 +17,19 @@ Prefer `Chekhov.page` and locator helpers under `ChekhovSuite`. Capabilities are
 `ZLayer` (same spirit as saferis `ConnectionProvider` / `Transactor`).
 """
     ),
+    section("Scala.js JSEnv")(
+      md"""
+For real-browser Scala.js tests, add the `sbt-chekhov` plugin (it depends on `chekhov-jsenv`)
+and set:
+
+```scala
+Test / jsEnv := chekhovJSEnv.value
+```
+
+Or construct `ChekhovJSEnv()` / `ChekhovJSEnv(ChekhovBrowser.Firefox)` directly once
+`chekhov-jsenv` is on the sbt classpath. Prefer `ModuleKind.ESModule` for linked test output.
+"""
+    ),
     section("Extending the command allowlist")(
       md"""
 Chekhov claims a **curated** set of Playwright channel methods. Param ADTs in
