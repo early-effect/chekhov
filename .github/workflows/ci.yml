@@ -19,6 +19,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/ms-playwright
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
@@ -36,6 +38,88 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+  cache-rehydrate:
+    name: cache-rehydrate
+    runs-on: ubuntu-latest
+    needs:
+      - verify-gate
+    if: needs.verify-gate.result == 'success' && needs.verify-gate.outputs.run == 'false'
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/ms-playwright
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: "0"
+          fetch-tags: "true"
+      - name: Setup JDK 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: sbt/setup-sbt@d059c39de700f4cc5cb64f9f56577315e44a984e # v1.5.5
+        with:
+          disk-cache: "false"
+      - name: Resolve cache epoch
+        id: cache-epoch
+        run: |
+          set -euo pipefail
+          tag_match='v*'
+          if git remote get-url origin >/dev/null 2>&1; then
+            remote_count=$(git ls-remote --tags --refs origin "$tag_match" 2>/dev/null | wc -l | tr -d ' ')
+            local_count=$(git tag -l "$tag_match" | wc -l | tr -d ' ')
+            if [ "$remote_count" -gt 0 ] && [ "$local_count" -lt "$remote_count" ]; then
+              echo "::warning title=zipx cache epoch::Local tags ($local_count) fewer than origin ($remote_count). Epoch may be stale; checkout must use fetch-depth: 0 and fetch-tags: true."
+            fi
+          fi
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            release="${GITHUB_REF#refs/tags/v}"
+            epoch="$release"
+          elif tag=$(git describe --tags --abbrev=0 --match "$tag_match" 2>/dev/null); then
+            release="${tag#v}"
+            epoch="${release}-ci"
+          else
+            echo "::warning title=zipx cache epoch::No tags matching '$tag_match' found; using epoch 0.0.0."
+            release="0.0.0"
+            epoch="0.0.0"
+          fi
+          echo "epoch=$epoch" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+      - name: Cache sbt
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.sbt
+            ~/.cache/sbt
+            ~/.cache/coursier
+            target
+          key: ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.epoch }}-${{ github.run_id }}-cache-rehydrate
+          restore-keys: |
+            ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.epoch }}-${{ github.run_id }}-
+            ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.epoch }}-
+            ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.release }}-
+            ubuntu-latest-jdk25-sbt-
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: npm ci (vite fixture)
+        run: npm ci --prefix examples/vite-fixture
+      - name: npm ci (ascent fixture)
+        run: npm ci --prefix examples/ascent-fixture
+      - name: Install Playwright browsers
+        run: |
+          set -euo pipefail
+          mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
+          chmod +x ./scripts/install-browsers.sh
+          ./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
+          echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
+
+      - name: cache-rehydrate
+        run: sbt 'compile'
   test:
     name: test
     runs-on: ubuntu-latest
@@ -43,8 +127,8 @@ jobs:
       - verify-gate
     if: "!cancelled() && !startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' && ((needs.verify-gate.result != 'success') || (needs.verify-gate.outputs.run == 'true'))"
     env:
-      CHEKHOV_E2E: "1"
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/ms-playwright
+      CHEKHOV_E2E: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -118,12 +202,20 @@ jobs:
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
 
       - name: test
-        run: sbt 'scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull'
+        run: |
+          if [ "$ZIPX_VERIFY_CLEAN_FULL" = "true" ]; then
+            sbt 'cleanFull; scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull'
+          else
+            sbt 'scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull'
+          fi
+        env:
+          ZIPX_VERIFY_CLEAN_FULL: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'clean') }}
   publish:
     name: publish
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/ms-playwright
       PGP_KEY_HEX: ${{ secrets.PGP_KEY_HEX }}
       PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
       SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
