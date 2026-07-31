@@ -116,9 +116,9 @@ object ChannelTransport:
             (process, in, out)
           }
           .mapError(e => ChekhovError.Driver("Failed to spawn Playwright driver", Some(e)))
-      } { case (p, in, out) =>
-        // Kill only. Do not close pipes here: out.close()/in.close() can block
-        // uninterruptibly on a wedged child, and Scope finalizers are uninterruptible.
+      } { case (p, _, _) =>
+        // Kill only. Do not close pipes: close can block uninterruptibly on a wedged child,
+        // and Scope finalizers are uninterruptible. Destroy EOFs the daemon reader.
         ZIO.attemptBlocking {
           p.destroyForcibly()
           p.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)
