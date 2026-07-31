@@ -26,7 +26,7 @@ object JsEnvComSpec extends ZIOSpecDefault:
   override def aspects =
     Chunk(
       TestAspect.withLiveClock,
-      TestAspect.timeout(20.seconds),
+      TestAspect.timeout(60.seconds),
       TestAspect.sequential,
     )
 
@@ -54,11 +54,11 @@ object JsEnvComSpec extends ZIOSpecDefault:
         )
         try
           run.send("ping")
-          val got = Option(inbox.poll(10, TimeUnit.SECONDS))
+          val got = Option(inbox.poll(15, TimeUnit.SECONDS))
           assertTrue(got.contains("pong"))
         finally
           run.close()
-          Await.result(run.future, 5.seconds)
+          Await.result(run.future, 30.seconds)
       }
     }
 

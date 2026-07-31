@@ -132,7 +132,12 @@ val zioTestSettings = Def.settings(
     "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
   ),
   Test / mainClass := None,
+  // Playwright channel + Vite fixtures share Node / ports; parallel suites race on CI.
+  Test / parallelExecution := false,
 )
+
+// One test task at a time across projects (protocol / driver / jsenv all spawn run-driver).
+Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
 
 lazy val root = (project in file("."))
   .aggregate(

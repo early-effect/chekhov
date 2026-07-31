@@ -27,7 +27,7 @@ object ViteFixtureSpec extends ZIOSpecDefault:
   override def aspects =
     Chunk(
       TestAspect.withLiveClock,
-      TestAspect.timeout(20.seconds),
+      TestAspect.timeout(60.seconds),
       TestAspect.sequential,
     )
 

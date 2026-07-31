@@ -105,15 +105,21 @@ object ChannelTransport:
           }
           .mapError(e => ChekhovError.Driver("Failed to spawn Playwright driver", Some(e)))
       } { case (p, in, out) =>
-        // Closing stdin makes run-driver exit; closing stdout unblocks the reader fiber.
-        ZIO.attemptBlocking {
-          try out.close()
-          catch case _: Throwable => ()
-          try in.close()
-          catch case _: Throwable => ()
-          p.destroy()
-          if !p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) then p.destroyForcibly()
-        }.orDie
+        // Kill the driver first. Closing the pipe before destroy can block forever when
+        // the child is stuck writing (full stdout buffer) and no longer reading stdin.
+        ZIO
+          .attemptBlocking {
+            p.destroyForcibly()
+            try out.close()
+            catch case _: Throwable => ()
+            try in.close()
+            catch case _: Throwable => ()
+            p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+            ()
+          }
+          .orDie
+          .timeout(3.seconds)
+          .unit
       }
       (process, in, out) = acquired
       waiters     <- Ref.make(Map.empty[Int, Promise[ChekhovError, ServerResponse]])

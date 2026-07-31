@@ -21,7 +21,7 @@ trait ChekhovSuite extends ZIOSpecDefault:
     Chunk(
       TestAspect.samples(1),
       TestAspect.withLiveClock,
-      TestAspect.timeout(20.seconds),
+      TestAspect.timeout(60.seconds),
     )
 end ChekhovSuite
 
