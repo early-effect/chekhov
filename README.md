@@ -116,14 +116,17 @@ the wire shape changes. After a bump:
 4. `CHEKHOV_E2E=1 sbt 'protocol/testOnly chekhov.protocol.DriverSmokeSpec' 'driver/testOnly chekhov.driver.MultiBrowserFixtureSpec'`
 
 **CI / zipx:** Verify runs `npm ci`, then `./scripts/install-browsers.sh` with
-`PLAYWRIGHT_BROWSERS_PATH` set to `target/ms-playwright` so browsers land under the
-zipx LocalDir `target` path and share the **same** sbt `actions/cache` key (epoch +
-`run_id`), not a separate `Linux-playwright-*` entry. After a `pwBump`, install may
-fetch new browser revisions once; subsequent PR pushes reuse the epoch cache.
-Commit `package-lock.json` with the bump. `zipxWorkflowCheck` is part of `sbt ci`
-so `build.sbt` setup steps cannot drift from `.github/workflows/ci.yml`. Regenerate
-with `sbt zipxWorkflowGenerate` only when you change zipx settings (Node version,
-browser env, etc.), not on every Playwright pin bump.
+`PLAYWRIGHT_BROWSERS_PATH` (build-wide `zipxEnv`, omitted from reusable-workflow
+callers since zipx 0.1.3) set to `target/ms-playwright` so browsers land under the
+LocalDir `target` path and share the **same** sbt `actions/cache` key (epoch +
+`run_id`). Mid-PR pushes reuse that key. After merge, Verify is skipped;
+`cache-rehydrate` runs the same browser `extraSteps` plus `compile` so `main`
+saves digests **and** browsers for the next PR. After a `pwBump`, install may
+fetch new revisions once. Commit `package-lock.json` with the bump.
+`zipxWorkflowCheck` is part of `sbt ci` so `build.sbt` setup steps cannot drift
+from `.github/workflows/ci.yml`. Regenerate with `sbt zipxWorkflowGenerate` only
+when you change zipx settings (Node version, browser env, etc.), not on every
+Playwright pin bump.
 
 **Granular tasks:**
 
