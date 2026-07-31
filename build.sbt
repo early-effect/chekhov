@@ -51,7 +51,7 @@ val ciVerify =
   "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
 zipxTestTask := ciVerify
 
-val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
+val chekhovBrowserSetup: StepContext => List[Step] = _ =>
   List(
     Step(
       name = Some("Set up Node"),
@@ -73,19 +73,13 @@ val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
       name = Some("npm ci (ascent fixture)"),
       run = Some("npm ci --prefix examples/ascent-fixture"),
     ),
-    Step(
-      name = Some("Cache Playwright browsers"),
-      uses = Some(ctx.actions.cache),
-      `with` = ListMap(
-        "path"         -> "~/.cache/ms-playwright",
-        "key"          -> "${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}",
-        "restore-keys" -> "${{ runner.os }}-playwright-",
-      ),
-    ),
+    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH on the job)
+    // so they ride the zipx LocalDir "Cache sbt" key (path already includes `target`).
     Step(
       name = Some("Install Playwright browsers"),
       run = Some(
         """|set -euo pipefail
+           |mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
            |chmod +x ./scripts/install-browsers.sh
            |./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
            |echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
@@ -97,7 +91,11 @@ val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
 zipxCapabilities += Capability.test.copy(
   command = _ => ciVerify,
   extraSteps = chekhovBrowserSetup,
-  env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
+  env = Map(
+    "CHEKHOV_E2E"              -> EnvValue.plain("1"),
+    // Same actions/cache entry as zipx LocalDir (includes `target`); no separate Playwright key.
+    "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
+  ),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()

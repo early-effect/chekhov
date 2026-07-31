@@ -81,8 +81,9 @@ sbt testFull
 Browsers land in Playwright’s default OS cache (`~/.cache/ms-playwright` on Linux,
 `~/Library/Caches/ms-playwright` on macOS). Prefer `./scripts/install-browsers.sh`
 (or `npm run playwright:install` / `sbt pwInstall`), which uses official
-`npx playwright install` on current Playwright. zipx CI caches that directory and
-sets `CHEKHOV_E2E=1`.
+`npx playwright install` on current Playwright. zipx CI installs under
+`target/ms-playwright` so browsers share the LocalDir sbt cache key, and sets
+`CHEKHOV_E2E=1`.
 
 ## Bumping Playwright
 
@@ -114,14 +115,15 @@ the wire shape changes. After a bump:
 3. `sbt pwInstall` if you need matching browser binaries locally
 4. `CHEKHOV_E2E=1 sbt 'protocol/testOnly chekhov.protocol.DriverSmokeSpec' 'driver/testOnly chekhov.driver.MultiBrowserFixtureSpec'`
 
-**CI / zipx:** Verify already runs `npm ci`, restores `~/.cache/ms-playwright` via
-`actions/cache` (key = `runner.os` + `hashFiles('package-lock.json')`), then
-`./scripts/install-browsers.sh`. A `pwBump` that updates the lockfile therefore
-misses the browser cache **once** on the next PR, then stays warm. Commit
-`package-lock.json` with the bump. `zipxWorkflowCheck` is part of `sbt ci` so
-`build.sbt` setup steps cannot drift from `.github/workflows/ci.yml`. Regenerate
+**CI / zipx:** Verify runs `npm ci`, then `./scripts/install-browsers.sh` with
+`PLAYWRIGHT_BROWSERS_PATH` set to `target/ms-playwright` so browsers land under the
+zipx LocalDir `target` path and share the **same** sbt `actions/cache` key (epoch +
+`run_id`), not a separate `Linux-playwright-*` entry. After a `pwBump`, install may
+fetch new browser revisions once; subsequent PR pushes reuse the epoch cache.
+Commit `package-lock.json` with the bump. `zipxWorkflowCheck` is part of `sbt ci`
+so `build.sbt` setup steps cannot drift from `.github/workflows/ci.yml`. Regenerate
 with `sbt zipxWorkflowGenerate` only when you change zipx settings (Node version,
-cache paths, etc.), not on every Playwright pin bump.
+browser env, etc.), not on every Playwright pin bump.
 
 **Granular tasks:**
 

@@ -44,6 +44,7 @@ jobs:
     if: "!cancelled() && !startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' && ((needs.verify-gate.result != 'success') || (needs.verify-gate.outputs.run == 'true'))"
     env:
       CHEKHOV_E2E: "1"
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/ms-playwright
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,15 +109,10 @@ jobs:
         run: npm ci --prefix examples/vite-fixture
       - name: npm ci (ascent fixture)
         run: npm ci --prefix examples/ascent-fixture
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-          restore-keys: ${{ runner.os }}-playwright-
       - name: Install Playwright browsers
         run: |
           set -euo pipefail
+          mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
           chmod +x ./scripts/install-browsers.sh
           ./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
