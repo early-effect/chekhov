@@ -173,6 +173,7 @@ lazy val root = (project in file("."))
     driver,
     `zio-test`,
     dom,
+    ascent,
     jsenv,
     `sbt-chekhov`,
     docs,
@@ -316,6 +317,35 @@ lazy val dom = (project in file("dom"))
         Seq.empty
     },
     // Monorepo only: load ChekhovJSEnv via classpath file (consumers use chekhovJSEnv / ChekhovJSEnv()).
+    Test / jsEnv := Def.uncached {
+      val f = (jsenv / writeJsenvClasspath).value
+      new chekhov.build.ChekhovJsEnvBridge(f)
+    },
+  )
+
+lazy val ascent = (project in file("ascent"))
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(dom)
+  .settings(
+    name := "chekhov-ascent",
+    scalacOptions ++= commonScalacOptions,
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    libraryDependencies ++= Seq(
+      "rocks.earlyeffect" %% "ascent-js"     % ascentVersion,
+      "dev.zio"           %% "zio"          % zioVersion,
+      "dev.zio"           %% "zio-test"     % zioVersion % Test,
+      "dev.zio"           %% "zio-test-sbt" % zioVersion % Test,
+    ),
+    Test / mainClass    := None,
+    Test / definedTests := Def.uncached {
+      val enabled =
+        sys.env.get("CHEKHOV_E2E").contains("1") ||
+          sys.props.get("chekhov.e2e").contains("1")
+      if enabled then (Test / definedTests).value
+      else
+        streams.value.log.info("chekhov-ascent tests skipped (set CHEKHOV_E2E=1 or -Dchekhov.e2e=1)")
+        Seq.empty
+    },
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)

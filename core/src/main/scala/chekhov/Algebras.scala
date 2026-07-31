@@ -62,11 +62,11 @@ object BrowserType:
     ZIO.serviceWith[BrowserType](_.name)
 
 trait Browser:
-  def newContext(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, BrowserContext]
+  def newContext(using Trace): ZIO[Scope & ChekhovConfig & ArtifactSession, ChekhovError, BrowserContext]
   def close(using Trace): IO[ChekhovError, Unit]
 
 object Browser:
-  def newContext(using Trace): ZIO[Browser & Scope & ChekhovConfig, ChekhovError, BrowserContext] =
+  def newContext(using Trace): ZIO[Browser & Scope & ChekhovConfig & ArtifactSession, ChekhovError, BrowserContext] =
     ZIO.serviceWithZIO[Browser](_.newContext)
 
   def close(using Trace): ZIO[Browser, ChekhovError, Unit] =
@@ -86,6 +86,13 @@ trait BrowserContext:
   def cookies(urls: Chunk[String] = Chunk.empty)(using Trace): IO[ChekhovError, Chunk[Cookie]]
   def addCookies(cookies: Chunk[CookieInit])(using Trace): IO[ChekhovError, Unit]
   def clearCookies(using Trace): IO[ChekhovError, Unit]
+
+  /** Start context tracing (screenshots + snapshots). Prefer [[ChekhovConfig.traceCapture]] for suite wiring. */
+  def startTracing(using Trace): IO[ChekhovError, Unit]
+
+  /** Stop tracing: [[TraceStop.Archive]] writes a zip; [[TraceStop.Discard]] drops the chunk. */
+  def stopTracing(how: TraceStop)(using Trace): IO[ChekhovError, Unit]
+
   def close(using Trace): IO[ChekhovError, Unit]
 end BrowserContext
 
@@ -107,6 +114,12 @@ object BrowserContext:
 
   def clearCookies(using Trace): ZIO[BrowserContext, ChekhovError, Unit] =
     ZIO.serviceWithZIO[BrowserContext](_.clearCookies)
+
+  def startTracing(using Trace): ZIO[BrowserContext, ChekhovError, Unit] =
+    ZIO.serviceWithZIO[BrowserContext](_.startTracing)
+
+  def stopTracing(how: TraceStop)(using Trace): ZIO[BrowserContext, ChekhovError, Unit] =
+    ZIO.serviceWithZIO[BrowserContext](_.stopTracing(how))
 
   def close(using Trace): ZIO[BrowserContext, ChekhovError, Unit] =
     ZIO.serviceWithZIO[BrowserContext](_.close)
