@@ -42,18 +42,9 @@ pomIncludeRepository := { _ => false }
 
 usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
 
-zipxJavaVersion      := "25"
-zipxWorkflowDispatch := true
-zipxScalaSteward     := true
-// LocalDir: after merge, skip full Verify but emit cache-rehydrate (compile) so main
-// gets an actions/cache save later PRs can restore. Defaults from zipx 0.1.1+.
-zipxCacheRehydrateOnMerge := true
-zipxCacheRehydrateTask    := "compile"
-
 // Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
 val ciVerify =
   "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
-zipxTestTask := ciVerify
 
 val chekhovBrowserSetup: StepContext => List[Step] = _ =>
   List(
@@ -77,7 +68,7 @@ val chekhovBrowserSetup: StepContext => List[Step] = _ =>
       name = Some("npm ci (ascent fixture)"),
       run = Some("npm ci --prefix examples/ascent-fixture"),
     ),
-    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH on the job)
+    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH via zipxEnv)
     // so they ride the zipx LocalDir "Cache sbt" key (path already includes `target`).
     Step(
       name = Some("Install Playwright browsers"),
@@ -92,14 +83,24 @@ val chekhovBrowserSetup: StepContext => List[Step] = _ =>
     ),
   )
 
+zipxJavaVersion      := "25"
+zipxWorkflowDispatch := true
+zipxScalaSteward     := true
+zipxTestTask         := ciVerify
+// LocalDir: after merge, skip full Verify but emit cache-rehydrate so main gets an
+// actions/cache save later PRs can restore (zipx 0.1.1+). Browser setup runs on
+// rehydrate too (0.1.2+ extraSteps); path is build-wide so Verify and rehydrate share it.
+zipxCacheRehydrateOnMerge    := true
+zipxCacheRehydrateTask       := "compile"
+zipxCacheRehydrateExtraSteps := chekhovBrowserSetup
+zipxEnv := Map(
+  "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
+)
+
 zipxCapabilities += Capability.test.copy(
   command = _ => ciVerify,
   extraSteps = chekhovBrowserSetup,
-  env = Map(
-    "CHEKHOV_E2E"              -> EnvValue.plain("1"),
-    // Same actions/cache entry as zipx LocalDir (includes `target`); no separate Playwright key.
-    "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
-  ),
+  env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
