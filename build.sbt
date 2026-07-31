@@ -46,7 +46,9 @@ zipxJavaVersion      := "25"
 zipxWorkflowDispatch := true
 zipxScalaSteward     := true
 
-val ciVerify = "scalafmtCheckAll; zipxWorkflowCheck; testFull; jsenv-smoke/testFull; dom/testFull"
+// Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
+val ciVerify =
+  "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
 zipxTestTask := ciVerify
 
 val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
@@ -136,8 +138,8 @@ val zioTestSettings = Def.settings(
   Test / parallelExecution := false,
 )
 
-// One test task at a time across projects (protocol / driver / jsenv all spawn run-driver).
-Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
+// One task at a time across the build (Tags.Test alone still allows parallel project tests on sbt 2).
+Global / concurrentRestrictions := Seq(Tags.limitAll(1))
 
 lazy val root = (project in file("."))
   .aggregate(

@@ -122,7 +122,7 @@ jobs:
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
 
       - name: test
-        run: sbt 'scalafmtCheckAll; zipxWorkflowCheck; testFull; jsenv-smoke/testFull; dom/testFull'
+        run: sbt 'scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull'
   publish:
     name: publish
     runs-on: ubuntu-latest

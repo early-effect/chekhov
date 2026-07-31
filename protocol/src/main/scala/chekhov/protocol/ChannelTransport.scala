@@ -132,11 +132,14 @@ object ChannelTransport:
       // Early Hub subscriber so pollEvent/receive never miss events.
       bufferQ <- eventHub.subscribe
       _       <- ZStream.fromQueue(bufferQ).runForeach(eventBuffer.offer).forkScoped
-      _       <- framedInbound(in)
+      // Daemon (not scoped): Scope close interrupts forkScoped fibers *before* process
+      // destroy. A blocking read cancel that closes the pipe hangs uninterruptibly on CI.
+      // Destroying the process EOFs the pipe and this fiber exits on its own.
+      _ <- framedInbound(in)
         .mapZIO(dispatch(_, waiters, eventHub))
         .ensuring(failWaiters(waiters, ChekhovError.Driver("Playwright driver pipe closed")))
         .runDrain
-        .forkScoped
+        .forkDaemon
     yield Pipe(process, in, out, waiters, eventHub, eventBuffer)
 
   val layer: ZLayer[Any, ChekhovError, ChannelTransport] =
@@ -203,7 +206,7 @@ object ChannelTransport:
 
   private def readExact(in: InputStream, n: Int)(using Trace): IO[ChekhovError, Array[Byte]] =
     ZIO
-      .attemptBlockingCancelable {
+      .attemptBlocking {
         val buf = new Array[Byte](n)
         var off = 0
         while off < n do
@@ -211,7 +214,7 @@ object ChannelTransport:
           if r < 0 then throw new java.io.EOFException("driver pipe closed")
           off += r
         buf
-      }(ZIO.attempt(in.close()).ignore)
+      }
       .mapError(e => ChekhovError.Protocol("read from driver failed", Some(e)))
 
   private def dispatch(
