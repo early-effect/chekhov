@@ -45,6 +45,10 @@ usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
 zipxJavaVersion      := "25"
 zipxWorkflowDispatch := true
 zipxScalaSteward     := true
+// LocalDir: after merge, skip full Verify but emit cache-rehydrate (compile) so main
+// gets an actions/cache save later PRs can restore. Defaults from zipx 0.1.1+.
+zipxCacheRehydrateOnMerge := true
+zipxCacheRehydrateTask    := "compile"
 
 // Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
 val ciVerify =
