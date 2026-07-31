@@ -26,7 +26,8 @@ private[jsenv] final class BrowserRunner(
   private val stopFlag    = new AtomicBoolean(false)
   private val sendQueue   = new ConcurrentLinkedQueue[String]()
   private val donePromise = Promise[Unit]()
-  private val stopRef     = new AtomicReference[Option[() => Unit]](None)
+  private val fiberRef    = new AtomicReference[Option[Fiber.Runtime[Any, Any]]](None)
+  private val runtime     = Unsafe.unsafe(implicit u => Runtime.default)
 
   def future: Future[Unit] = donePromise.future
 
@@ -36,7 +37,11 @@ private[jsenv] final class BrowserRunner(
   def close(): Unit =
     if closed.compareAndSet(false, true) then
       stopFlag.set(true)
-      stopRef.get().foreach(_())
+      fiberRef.get().foreach { fiber =>
+        Unsafe.unsafe { implicit u =>
+          val _ = runtime.unsafe.run(fiber.interrupt)
+        }
+      }
 
   def start(inputs: Seq[Input]): Unit =
     val thread = new Thread(
@@ -70,11 +75,6 @@ private[jsenv] final class BrowserRunner(
       )
     }
 
-    val stopFlagLocal = stopFlag
-    stopRef.set(Some(() =>
-      stopFlagLocal.set(true); ()
-    ))
-
     val program =
       ZIO
         .scoped {
@@ -92,14 +92,19 @@ private[jsenv] final class BrowserRunner(
 
     try
       Unsafe.unsafe { implicit u =>
-        Runtime.default.unsafe.run(program) match
+        val fiber = runtime.unsafe.fork(program)
+        fiberRef.set(Some(fiber))
+        runtime.unsafe.run(fiber.await) match
           case Exit.Success(_) =>
             if !donePromise.isCompleted then donePromise.success(())
           case Exit.Failure(cause) =>
-            if !donePromise.isCompleted then
+            if cause.isInterruptedOnly then
+              if !donePromise.isCompleted then donePromise.success(())
+            else if !donePromise.isCompleted then
               donePromise.failure(cause.failureOption.getOrElse(new RuntimeException(cause.prettyPrint)))
       }
     finally
+      fiberRef.set(None)
       try outPs.close()
       catch case NonFatal(_) => ()
       try errPs.close()

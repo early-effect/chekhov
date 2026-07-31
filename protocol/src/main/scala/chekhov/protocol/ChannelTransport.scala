@@ -16,7 +16,12 @@ import scala.jdk.CollectionConverters.*
 /** Framed JSON pipe to the Playwright Node driver (`run-driver`). */
 trait ChannelTransport:
   def send(request: ClientRequest)(using Trace): IO[ChekhovError, Unit]
-  def sendAndWait(request: ClientRequest)(using Trace): IO[ChekhovError, ServerResponse]
+  def sendAndWait(request: ClientRequest, timeout: Duration = 30.seconds)(using
+      Trace
+  ): IO[ChekhovError, ServerResponse]
+
+  /** True while the Node `run-driver` process is alive. */
+  def isAlive: Boolean
 
   /** Subscribe to server events (Hub). Call before sending work that emits events. */
   def subscribeEvents(using Trace): ZIO[Scope, Nothing, Dequeue[ServerEvent]]
@@ -39,26 +44,33 @@ object ChannelTransport:
       eventBuffer: Queue[ServerEvent],
   ) extends ChannelTransport:
 
-    def send(request: ClientRequest)(using Trace): IO[ChekhovError, Unit] =
-      ZIO
-        .attemptBlocking {
-          val bytes = request.toJson.getBytes(StandardCharsets.UTF_8)
-          val len   = ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(bytes.length).array()
-          out.write(len)
-          out.write(bytes)
-          out.flush()
-        }
-        .mapError(e => ChekhovError.Protocol(s"Failed to send ${request.method}", Some(e)))
+    def isAlive: Boolean = process.isAlive
 
-    def sendAndWait(request: ClientRequest)(using Trace): IO[ChekhovError, ServerResponse] =
+    def send(request: ClientRequest)(using Trace): IO[ChekhovError, Unit] =
+      if !process.isAlive then ZIO.fail(ChekhovError.Driver("Playwright driver process is not alive"))
+      else
+        ZIO
+          .attemptBlocking {
+            val bytes = request.toJson.getBytes(StandardCharsets.UTF_8)
+            val len   = ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(bytes.length).array()
+            out.write(len)
+            out.write(bytes)
+            out.flush()
+          }
+          .mapError(e => ChekhovError.Protocol(s"Failed to send ${request.method}", Some(e)))
+          .timeoutFail(ChekhovError.Timeout(s"Blocked sending ${request.method} to driver"))(5.seconds)
+
+    def sendAndWait(request: ClientRequest, timeout: Duration = 30.seconds)(using
+        Trace
+    ): IO[ChekhovError, ServerResponse] =
       for
         promise <- Promise.make[ChekhovError, ServerResponse]
         _       <- waiters.update(_ + (request.id -> promise))
         _       <- send(request)
         resp    <- promise.await
           .timeoutFail(
-            ChekhovError.Timeout(s"No response for ${request.method} (id=${request.id}) within 30s")
-          )(30.seconds)
+            ChekhovError.Timeout(s"No response for ${request.method} (id=${request.id}) within $timeout")
+          )(timeout)
           .ensuring(waiters.update(_ - request.id).unit)
       yield resp
 
@@ -105,31 +117,24 @@ object ChannelTransport:
           }
           .mapError(e => ChekhovError.Driver("Failed to spawn Playwright driver", Some(e)))
       } { case (p, in, out) =>
-        // Kill the driver first. Closing the pipe before destroy can block forever when
-        // the child is stuck writing (full stdout buffer) and no longer reading stdin.
-        ZIO
-          .attemptBlocking {
-            p.destroyForcibly()
-            try out.close()
-            catch case _: Throwable => ()
-            try in.close()
-            catch case _: Throwable => ()
-            p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-            ()
-          }
-          .orDie
-          .timeout(3.seconds)
-          .unit
+        // Kill only. Do not close pipes here: out.close()/in.close() can block
+        // uninterruptibly on a wedged child, and Scope finalizers are uninterruptible.
+        ZIO.attemptBlocking {
+          p.destroyForcibly()
+          p.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)
+          ()
+        }.ignore
       }
       (process, in, out) = acquired
       waiters     <- Ref.make(Map.empty[Int, Promise[ChekhovError, ServerResponse]])
-      eventHub    <- Hub.unbounded[ServerEvent]
-      eventBuffer <- Queue.unbounded[ServerEvent]
+      eventHub    <- ZIO.acquireRelease(Hub.unbounded[ServerEvent])(_.shutdown)
+      eventBuffer <- ZIO.acquireRelease(Queue.unbounded[ServerEvent])(_.shutdown)
       // Early Hub subscriber so pollEvent/receive never miss events.
       bufferQ <- eventHub.subscribe
       _       <- ZStream.fromQueue(bufferQ).runForeach(eventBuffer.offer).forkScoped
       _       <- framedInbound(in)
         .mapZIO(dispatch(_, waiters, eventHub))
+        .ensuring(failWaiters(waiters, ChekhovError.Driver("Playwright driver pipe closed")))
         .runDrain
         .forkScoped
     yield Pipe(process, in, out, waiters, eventHub, eventBuffer)
@@ -138,6 +143,14 @@ object ChannelTransport:
     ZLayer.scoped(live)
 
   private final case class DriverPaths(node: String, cli: String)
+
+  private def failWaiters(
+      waiters: Ref[Map[Int, Promise[ChekhovError, ServerResponse]]],
+      err: ChekhovError,
+  )(using Trace): UIO[Unit] =
+    waiters.getAndSet(Map.empty).flatMap { map =>
+      ZIO.foreachDiscard(map.values)(_.fail(err).unit)
+    }
 
   private def resolveDriver(using Trace): IO[ChekhovError, DriverPaths] =
     ZIO
@@ -229,7 +242,7 @@ object ChannelTransport:
           .fromEither(json.as[ServerEvent])
           .foldZIO(
             _ => ZIO.unit,
-            event => eventHub.publish(event).unit,
+            event => eventHub.publish(event).timeout(1.second).unit,
           )
       case _ =>
         ZIO.unit

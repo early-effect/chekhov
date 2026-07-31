@@ -10,7 +10,7 @@ final case class ServeConfig(
     command: List[String],
     cwd: Path,
     readyUrl: String,
-    readyTimeout: Duration = 120.seconds,
+    readyTimeout: Duration = 45.seconds,
     env: Map[String, String] = Map.empty,
 )
 
@@ -39,9 +39,10 @@ object AppServer:
           .mapError(e => ChekhovError.Serve(s"Failed to start ${config.command.mkString(" ")}", Some(e)))
       } { p =>
         ZIO.attemptBlocking {
-          p.destroy()
-          if !p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) then p.destroyForcibly()
-        }.orDie
+          p.destroyForcibly()
+          p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+          ()
+        }.ignore
       }
       _ <- waitUntilReady(config.readyUrl, config.readyTimeout, process, logFile)
     yield new AppServer:
@@ -71,6 +72,7 @@ object AppServer:
         command = withPort,
         cwd = dir,
         readyUrl = s"http://127.0.0.1:$port",
+        readyTimeout = 45.seconds,
         env = Map("BROWSER" -> "none") ++ env,
       )
     )
@@ -89,6 +91,12 @@ object AppServer:
   private def waitUntilReady(url: String, timeout: Duration, process: Process, logFile: Path)(using
       Trace
   ): IO[ChekhovError, Unit] =
+    def failWithLog(why: String): IO[ChekhovError, Nothing] =
+      val tail =
+        try Files.readString(logFile).takeRight(2000)
+        catch case _: Throwable => ""
+      ZIO.fail(ChekhovError.Serve(s"$why at $url (alive=${process.isAlive}). Log:\n$tail"))
+
     def attempt: UIO[Boolean] =
       ZIO
         .attemptBlocking {
@@ -104,23 +112,19 @@ object AppServer:
         }
         .orElseSucceed(false)
 
-    def loop: UIO[Boolean] =
-      attempt.flatMap {
-        case true  => ZIO.succeed(true)
-        case false => ZIO.sleep(200.millis) *> loop
-      }
+    def loop: IO[ChekhovError, Boolean] =
+      if !process.isAlive then failWithLog("Server process exited before ready")
+      else
+        attempt.flatMap {
+          case true  => ZIO.succeed(true)
+          case false => ZIO.sleep(200.millis) *> loop
+        }
 
     loop
       .timeout(timeout)
       .flatMap {
         case Some(true) => ZIO.unit
-        case _          =>
-          val tail =
-            try Files.readString(logFile).takeRight(2000)
-            catch case _: Throwable => ""
-          ZIO.fail(
-            ChekhovError.Serve(s"Server not ready at $url within $timeout (alive=${process.isAlive}). Log:\n$tail")
-          )
+        case _          => failWithLog(s"Server not ready within $timeout")
       }
   end waitUntilReady
 end AppServer

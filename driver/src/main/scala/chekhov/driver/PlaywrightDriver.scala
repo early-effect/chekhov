@@ -20,14 +20,19 @@ object PlaywrightDriver:
     def launch(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, Browser] =
       for
         config <- ZIO.service[ChekhovConfig]
+        // GitHub Actions / containers: Chromium needs the sandbox disabled.
+        ci = sys.env.get("CI").contains("true") || sys.env.get("GITHUB_ACTIONS").contains("true")
         result <- conn.send(
           typeGuid,
           "launch",
-          Commands.BrowserTypeLaunch(headless = Some(config.headless)),
+          Commands.BrowserTypeLaunch(
+            headless = Some(config.headless),
+            chromiumSandbox = if ci then Some(false) else None,
+          ),
         )
         guid <- guidOf(result, "browser")
         b = BrowserLive(conn, guid)
-        _ <- ZIO.addFinalizer(b.close.orDie)
+        _ <- ZIO.addFinalizer(b.close)
       yield b
   end BrowserTypeService
 
@@ -37,11 +42,11 @@ object PlaywrightDriver:
         result  <- conn.send(guid, "newContext", Commands.BrowserNewContext())
         ctxGuid <- guidOf(result, "context")
         ctx = BrowserContextLive(conn, ctxGuid)
-        _ <- ZIO.addFinalizer(ctx.close.orDie)
+        _ <- ZIO.addFinalizer(ctx.close)
       yield ctx
 
-    def close(using Trace): IO[ChekhovError, Unit] =
-      conn.send(guid, "close", Commands.BrowserClose()).unit
+    def close(using Trace): UIO[Unit] =
+      conn.sendClose(guid, "close")
   end BrowserLive
 
   final case class BrowserContextLive(conn: ChannelConnection, guid: String) extends BrowserContext:
@@ -53,7 +58,7 @@ object PlaywrightDriver:
         init      <- conn.awaitInitializer(pageGuid)
         frameGuid <- mainFrameGuid(init)
         page = PageLive(conn, pageGuid, frameGuid)
-        _ <- ZIO.addFinalizer(page.close.orDie)
+        _ <- ZIO.addFinalizer(page.close)
       yield page
 
     def storageState(indexedDB: Boolean = false)(using Trace): IO[ChekhovError, String] =
@@ -86,8 +91,8 @@ object PlaywrightDriver:
     def clearCookies(using Trace): IO[ChekhovError, Unit] =
       conn.send(guid, "clearCookies", Commands.BrowserContextClearCookies()).unit
 
-    def close(using Trace): IO[ChekhovError, Unit] =
-      conn.send(guid, "close", Commands.BrowserContextClose()).unit
+    def close(using Trace): UIO[Unit] =
+      conn.sendClose(guid, "close")
   end BrowserContextLive
 
   /** Page-facing API; DOM commands go to `frameGuid` (main frame). */
@@ -214,8 +219,8 @@ object PlaywrightDriver:
       def press(key: String)(using Trace): IO[ChekhovError, Unit] =
         conn.send(guid, "keyboardPress", Commands.PageKeyboardPress(key = key)).unit
 
-    def close(using Trace): IO[ChekhovError, Unit] =
-      conn.send(guid, "close", Commands.PageClose()).unit
+    def close(using Trace): UIO[Unit] =
+      conn.sendClose(guid, "close")
   end PageLive
 
   final case class LocatorLive(conn: ChannelConnection, frameGuid: String, selector: String) extends Locator:

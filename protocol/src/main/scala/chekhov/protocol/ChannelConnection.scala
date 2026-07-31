@@ -11,6 +11,7 @@ import zio.stream.*
 trait ChannelConnection:
   def send[A: JsonEncoder](guid: String, method: String, params: A)(using Trace): IO[ChekhovError, Json]
   def sendEmpty(guid: String, method: String)(using Trace): IO[ChekhovError, Json]
+  def sendClose(guid: String, method: String)(using Trace): UIO[Unit]
   def playwrightGuid: String
   def initializer: Json
 
@@ -33,6 +34,14 @@ object ChannelConnection:
   ) extends ChannelConnection:
 
     def send[A: JsonEncoder](guid: String, method: String, params: A)(using Trace): IO[ChekhovError, Json] =
+      send(guid, method, params, timeout = 30.seconds)
+
+    def send[A: JsonEncoder](
+        guid: String,
+        method: String,
+        params: A,
+        timeout: Duration,
+    )(using Trace): IO[ChekhovError, Json] =
       for
         id         <- nextId.getAndUpdate(_ + 1)
         paramsJson <- ZIO
@@ -45,7 +54,7 @@ object ChannelConnection:
           params = Some(paramsJson),
           metadata = Some(emptyMetadata),
         )
-        resp   <- transport.sendAndWait(req)
+        resp   <- transport.sendAndWait(req, timeout)
         result <- resp.error.match
           case Some(err) => ZIO.fail(ChekhovError.Protocol(err.toString))
           case None      =>
@@ -56,6 +65,13 @@ object ChannelConnection:
 
     def sendEmpty(guid: String, method: String)(using Trace): IO[ChekhovError, Json] =
       send(guid, method, Json.Obj())
+
+    /** Best-effort close RPC; skips when the driver is already dead. */
+    def sendClose(guid: String, method: String)(using Trace): UIO[Unit] =
+      transport match
+        case t if !t.isAlive => ZIO.unit
+        case _               =>
+          send(guid, method, Json.Obj(), timeout = 3.seconds).unit.ignore
 
     def awaitInitializer(guid: String)(using Trace): IO[ChekhovError, Json] =
       def loop: IO[ChekhovError, Json] =

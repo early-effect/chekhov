@@ -29,7 +29,7 @@ object AscentFixtureSpec extends ZIOSpecDefault:
   override def aspects =
     Chunk(
       TestAspect.withLiveClock,
-      TestAspect.timeout(180.seconds),
+      TestAspect.timeout(90.seconds),
       TestAspect.sequential,
     )
 
