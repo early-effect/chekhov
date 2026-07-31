@@ -1,0 +1,215 @@
+# chekhov
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-earlyeffect.rocks-blue)](https://www.earlyeffect.rocks/chekhov/)
+
+**ZIO-first** Playwright client for Scala 3, plus a Scala.js DOM helper / JSEnv path for real-browser component tests.
+Named for *Chekhov's gun*: if the UI shows a control, a test should be able to fire it.
+
+> **Status: early / pre-1.0.** Published under [early-semver](https://www.scala-sbt.org/1.x/docs/Publishing.html#Version+scheme).
+> No `com.microsoft.playwright` JAR: Chekhov speaks Playwright's channel protocol from Scala/ZIO.
+
+```scala
+import chekhov.*
+import chekhov.ziotest.ChekhovSuite
+import zio.test.*
+
+object TodoSpec extends ChekhovSuite:
+  def spec = suite("todo")(
+    test("add") {
+      for
+        page <- Chekhov.page
+        _    <- page.goto("/")
+        _    <- page.fill("input.new-todo", "milk")
+        _    <- page.press("input.new-todo", "Enter")
+        text <- page.innerText(".todo-list")
+      yield assertTrue(text.contains("milk"))
+    }
+  )
+```
+
+## Modules
+
+| Module | Artifact | Role |
+|--------|----------|------|
+| `core` | `chekhov-core` | Config, errors, ZIO algebras, scoped `AppServer` / static serve |
+| `protocol` | `chekhov-protocol` | `protocol.yml` → Scala AST + zio-json codecs + pipe transport |
+| `driver` | `chekhov-driver` | Channel interpreter (`PlaywrightDriver` layers) |
+| `zio-test` | `chekhov-zio-test` | `ChekhovSuite`, multi-browser helpers |
+| `dom` | `chekhov-dom` | Scala.js in-page helpers (`withRoot`, waits, testid/role/CSS) |
+| `jsenv` | `chekhov-jsenv` | Playwright-backed `ChekhovJSEnv` (scripts in a real browser page) |
+| `sbt-chekhov` | `sbt-chekhov` | Artifact dir / browser props + `chekhovInstall` |
+
+## Install
+
+```scala
+libraryDependencies ++= Seq(
+  "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
+)
+// optional JSEnv / DOM
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "<version>" % Test
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+```
+
+```bash
+npm ci
+npm ci --prefix examples/vite-fixture
+npm ci --prefix examples/ascent-fixture
+./scripts/install-browsers.sh   # or: npm run playwright:install
+export CHEKHOV_E2E=1
+sbt test
+```
+
+Browsers land in Playwright’s default OS cache (`~/.cache/ms-playwright` on Linux,
+`~/Library/Caches/ms-playwright` on macOS). Prefer `./scripts/install-browsers.sh`
+(or `npm run playwright:install` / `sbt pwInstall`), which uses official
+`npx playwright install` on current Playwright. zipx CI caches that directory and
+sets `CHEKHOV_E2E=1`.
+
+## Bumping Playwright
+
+Chekhov pins a Playwright **npm** version and vendors the matching channel
+`protocol.yml` (merged from `packages/protocol/spec/*.yml` on modern tags). Keep
+those in sync; do not edit the vendored YAML by hand.
+
+**One-liner (recommended):**
+
+```bash
+sbt 'playwrightBump 1.62.1'          # or: sbt 'pwBump 1.62.1'
+sbt playwrightBumpLatest             # or: sbt pwBumpLatest
+sbt playwrightInstallBrowsers        # or: sbt pwInstall   (optional, after bump)
+```
+
+`playwrightBump <version>` / `playwrightBumpLatest` will:
+
+1. Pin `devDependencies.playwright` in `package.json` and run `npm install`
+2. Download the protocol for that GitHub tag and write
+   `protocol/src/main/resources/playwright/protocol.yml`
+3. Regenerate `protocol/.../generated/ProtocolMeta.scala` (version + definition inventory)
+
+It regenerates `ProtocolMeta`, `SharedTypes`, `ProtocolSurface`, and allowlist
+**`Commands`** (param ADTs from YAML `parameters:`). Envelopes stay small/stable unless
+the wire shape changes. After a bump:
+
+1. Skim the `protocol.yml` / `Commands.scala` diff for claimed-surface changes
+2. Extend the allowlist + `PlaywrightDriver` if the dogfood path needs a new method, then `sbt pwCodegen`
+3. `sbt pwInstall` if you need matching browser binaries locally
+4. `CHEKHOV_E2E=1 sbt 'protocol/testOnly chekhov.protocol.DriverSmokeSpec' 'driver/testOnly chekhov.driver.MultiBrowserFixtureSpec'`
+
+**CI / zipx:** Verify already runs `npm ci`, restores `~/.cache/ms-playwright` via
+`actions/cache` (key = `runner.os` + `hashFiles('package-lock.json')`), then
+`./scripts/install-browsers.sh`. A `pwBump` that updates the lockfile therefore
+misses the browser cache **once** on the next PR, then stays warm. Commit
+`package-lock.json` with the bump. `zipxWorkflowCheck` is part of `sbt ci` so
+`build.sbt` setup steps cannot drift from `.github/workflows/ci.yml`. Regenerate
+with `sbt zipxWorkflowGenerate` only when you change zipx settings (Node version,
+cache paths, etc.), not on every Playwright pin bump.
+
+**Granular tasks:**
+
+| Task | Alias | What it does |
+|------|-------|----------------|
+| `playwrightBump <ver>` | `pwBump` | Full pin + vendor + ProtocolMeta + SharedTypes/Surface/Commands |
+| `playwrightBumpLatest` | `pwBumpLatest` | Same, version from `npm view playwright version` |
+| `playwrightVendorProtocol` | `pwVendor` | Re-vendor YAML + ProtocolMeta + SharedTypes/Surface/Commands |
+| `playwrightRegenMeta` | | ProtocolMeta only (from on-disk YAML) |
+| `playwrightCodegen` | `pwCodegen` | SharedTypes + ProtocolSurface + allowlist Commands |
+| `playwrightInstallBrowsers` | `pwInstall` | `./scripts/install-browsers.sh` |
+| `playwrightVersion` | | Show the pin read from `package.json` |
+
+```bash
+sbt 'show playwrightVersion'
+```
+
+## Extending the command allowlist
+
+Chekhov does **not** implement every Playwright channel method. Claimed methods live in a
+curated allowlist; param ADTs are **generated** from `protocol.yml`. Do not edit
+`protocol/.../generated/Commands.scala` field lists by hand.
+
+**When to add:** a dogfood suite or hub app (e.g. mermoid needing `storageState` /
+IndexedDB / `webStorage*`) needs a channel method that is not yet claimed.
+
+**How to add:**
+
+1. Confirm the method exists for the pinned protocol:
+   - `ProtocolSurface.has("<Channel>", "<method>")` (after `sbt pwCodegen`), or
+   - search `protocol/src/main/resources/playwright/protocol.yml` under that channel’s `commands:`
+2. Append a row to `ProtocolCodegen.commandAllowlist` in
+   `project/ProtocolCodegen.scala`:
+
+   ```scala
+   CommandSpec("BrowserContext", "storageState", "BrowserContextStorageState"),
+   //           ^channel           ^YAML method    ^Scala case class name
+   ```
+
+3. Regenerate:
+
+   ```bash
+   sbt pwCodegen
+   ```
+
+4. Wire the interpreter in `PlaywrightDriver` (guid + `conn.send(..., "method", Commands.YourType(...))`)
+   and, if it is part of the public API, expose it on the ZIO algebra in `core`.
+5. Extend coverage / a small test if the method is load-bearing (storage cluster, etc.).
+6. Commit the allowlist change **and** the regenerated `Commands.scala` /
+   `ProtocolSurface.scala` / `SharedTypes.scala` as needed.
+
+**What stays curated (not generated from YAML fields):** allowlist membership, driver
+wiring, algebra surface. **What is generated:** case class fields + codecs for each
+allowlist entry (including `$mixin` expansion).
+
+**Hub storage cluster:** `BrowserContext.storageState` / `setStorageState` (IndexedDB via
+`indexedDB = true`), cookies (`cookies` / `addCookies` / `clearCookies`), page
+`webStorage*` (`WebStorageKind.Local` / `Session`).
+
+## ZIO layers (saferis-style)
+
+Services are traits with `ZLayer` companions:
+
+- `ChannelTransport.layer` — scoped Node `run-driver` pipe
+- `ChannelConnection.layer` — initialize + request/response
+- `PlaywrightDriver.withBrowserType` / `browserLayer` / `pageLayer`
+- `AppServer.viteLayer(dir)` / `StaticFileServer.layer(dir)` — scoped serve + readiness
+- `ChekhovConfig.layer` — env / `-Dchekhov.*` defaults; artifacts under `target/chekhov`
+
+## JSEnv
+
+`ChekhovJSEnv` runs Scala.js scripts inside a real Playwright browser (same channel
+driver / browser install as the JVM client). Materializes `Input.Script` /
+`Input.ESModule` onto a localhost page and bridges `scalajsCom` via frame
+`evaluateExpression`.
+
+```scala
+import chekhov.jsenv.ChekhovJSEnv
+import org.scalajs.jsenv.JSEnv
+
+Test / jsEnv := ChekhovJSEnv() // or ChekhovJSEnv(ChekhovBrowser.Firefox)
+```
+
+Live smoke (from this repo, with browsers installed):
+
+```bash
+CHEKHOV_E2E=1 sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
+CHEKHOV_E2E=1 sbt jsenv-smoke/test   # Scala.js assertTrue via ChekhovJSEnv
+CHEKHOV_E2E=1 sbt dom/test           # chekhov-dom helpers in Chromium
+```
+
+## Engines
+
+Chromium, Firefox, and WebKit are first-class. Use `ChekhovSuite.forBrowsers` or `-Dchekhov.browser=firefox`.
+
+## Contributing
+
+Once per clone, enable the scalafmt pre-commit hook:
+
+```bash
+./scripts/install-git-hooks
+```
+
+Formatting is enforced (`sbt scalafmtCheckAll`). CI workflows are generated by
+[zipx](https://github.com/early-effect/zipx) (`sbt zipxWorkflowGenerate` after module changes).
+
+## License
+
+Apache-2.0

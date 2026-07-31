@@ -1,0 +1,15 @@
+{
+  "name": "chekhov-ascent-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite-plugin-scalajs-ascent": "file:./_vendor/vite-plugin-scalajs-ascent",
+    "vite": "^7.0.0"
+  }
+}
