@@ -21,6 +21,23 @@ object ChekhovBrowser:
       case "webkit"              => Some(WebKit)
       case _                     => None
 
+/** When to keep Playwright traces / videos under [[ChekhovConfig.artifactsDir]]. */
+enum ArtifactCapture:
+  case Off, OnFailure, Always
+
+object ArtifactCapture:
+  def fromString(s: String): Option[ArtifactCapture] =
+    s.trim.toLowerCase match
+      case "off" | "false" | "0" | "none"         => Some(Off)
+      case "onfailure" | "on-failure" | "failure" => Some(OnFailure)
+      case "always" | "true" | "1" | "on"         => Some(Always)
+      case _                                      => None
+
+/** How to finish a tracing session started via [[BrowserContext.startTracing]]. */
+enum TraceStop:
+  case Archive(path: Path)
+  case Discard
+
 /** Runtime configuration for Chekhov suites and drivers. */
 final case class ChekhovConfig(
     browser: ChekhovBrowser = ChekhovBrowser.Chromium,
@@ -29,6 +46,8 @@ final case class ChekhovConfig(
     artifactsDir: Path = Path.of("target", "chekhov"),
     defaultTimeoutMs: Double = 30_000,
     browserInstallEnv: Map[String, String] = Map.empty,
+    traceCapture: ArtifactCapture = ArtifactCapture.Off,
+    videoCapture: ArtifactCapture = ArtifactCapture.Off,
 )
 
 object ChekhovConfig:
@@ -50,6 +69,16 @@ object ChekhovConfig:
           .orElse(sys.env.get("CHEKHOV_ARTIFACTS_DIR"))
           .map(Path.of(_))
           .getOrElse(Path.of("target", "chekhov")),
+        traceCapture = sys.props
+          .get("chekhov.traceCapture")
+          .orElse(sys.env.get("CHEKHOV_TRACE_CAPTURE"))
+          .flatMap(ArtifactCapture.fromString)
+          .getOrElse(ArtifactCapture.Off),
+        videoCapture = sys.props
+          .get("chekhov.videoCapture")
+          .orElse(sys.env.get("CHEKHOV_VIDEO_CAPTURE"))
+          .flatMap(ArtifactCapture.fromString)
+          .getOrElse(ArtifactCapture.Off),
       )
 
   def layer(config: ChekhovConfig): ULayer[ChekhovConfig] =

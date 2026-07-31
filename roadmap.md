@@ -36,6 +36,7 @@ Stack target: Scala **3.8.4**, ZIO **2.1.x**, sbt **2.x**, Scala.js **1.22**, Pl
 | `driver` | `chekhov-driver` | Interpreter + `PlaywrightDriver` layers |
 | `zio-test` | `chekhov-zio-test` | `ChekhovSuite`, multi-browser helpers |
 | `dom` | `chekhov-dom` | In-page Scala.js helpers |
+| `ascent` | `chekhov-ascent` | `withMounted` for ascent UI + `chekhov-dom` (JSEnv) |
 | `jsenv` | `chekhov-jsenv` | Real-browser `JSEnv` (launcher shares driver install) |
 | `sbt-chekhov` | `sbt-chekhov` | `jsEnv`, `chekhovInstall`, artifact / browser props |
 | `docs` | unpublished | Specular + hub metadata |
@@ -180,10 +181,10 @@ Still curated (not generated from YAML field lists):
 - `AscentFixtureSpec`: Chromium / Firefox / WebKit (`driver/test` depends on `writeAscentFixtureOut` → `fastLinkJS`)
 - `AppServer.vite`: host/port/`--open=false` + `BROWSER=none`
 - `getByPlaceholder` via CSS; `Page.keyboardPress`; `ChekhovSuite` includes `BrowserContext`
+- In-repo `chekhov-ascent` (`withMounted` over `chekhov-dom` + `ascent-js`)
 
 ### Next
 
-- Optional `chekhov-ascent` bridge (`withMounted`) once Chekhov is publishable
 - Richer ascent dogfood in the ascent repo once Chekhov is on Central
 
 ---
@@ -200,12 +201,12 @@ Still curated (not generated from YAML field lists):
 - `Page.screenshot` + `ChekhovSuite.screenshotOnFailure` (PNG under `artifactsDir/failures`)
 - Publish-friendly `chekhovJSEnv` via `sbt-chekhov` (see Phase 2)
 - Specular consumer guide: Quickstart, Browsers and E2E, Serving the app, JSEnv and chekhov-dom, Algebras tour, Contributing
+- Opt-in traces / video via `ArtifactCapture` (`Off` / `OnFailure` / `Always`) under `artifactsDir/traces` and `artifactsDir/videos`
+- In-repo `chekhov-ascent` (`withMounted`) + README / Specular install notes
 
 ### Next
 
 - First `v*` Central release (clears docs `0.0.0-ci` / `v<version>` display)
-- Traces / video under `artifactsDir`
-- README polish as the surface grows
 
 ---
 
@@ -234,6 +235,5 @@ Still curated (not generated from YAML field lists):
 ## Suggested near-term order
 
 1. First `v*` Central publish + docs regen (fix install chrome version)
-2. Traces / video under `artifactsDir`
-3. Optional `chekhov-ascent` / JSEnv component suite in the ascent repo
-4. Grow allowlist further as hub apps need it (IndexedDB-heavy paths already via `storageState(indexedDB = true)`)
+2. Grow allowlist further as hub apps need it (IndexedDB-heavy paths already via `storageState(indexedDB = true)`)
+3. Richer ascent dogfood in the ascent repo once Chekhov is on Central

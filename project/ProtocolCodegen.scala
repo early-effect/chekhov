@@ -13,7 +13,7 @@ object ProtocolCodegen:
 
   /** Channels whose command inventories feed the coverage gate. */
   val surfaceChannels: List[String] =
-    List("Root", "Playwright", "BrowserType", "Browser", "BrowserContext", "Page", "Frame")
+    List("Root", "Playwright", "BrowserType", "Browser", "BrowserContext", "Page", "Frame", "Tracing", "Artifact")
 
   /** Claimed interpreter surface: protocol channel + method → generated case class name.
     *
@@ -51,6 +51,12 @@ object ProtocolCodegen:
     CommandSpec("Page", "keyboardPress", "PageKeyboardPress"),
     CommandSpec("Page", "screenshot", "PageScreenshot"),
     CommandSpec("Page", "close", "PageClose"),
+    // Context tracing + artifact save (traces / video under artifactsDir)
+    CommandSpec("Tracing", "tracingStart", "TracingStart"),
+    CommandSpec("Tracing", "tracingStartChunk", "TracingStartChunk"),
+    CommandSpec("Tracing", "tracingStopChunk", "TracingStopChunk"),
+    CommandSpec("Tracing", "tracingStop", "TracingStop"),
+    CommandSpec("Artifact", "saveAs", "ArtifactSaveAs"),
   )
 
   private val sharedObjectNames: Set[String] =

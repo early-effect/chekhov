@@ -62,5 +62,24 @@ On failure, writes `artifactsDir/failures/<timestamp>-login.png` when `Page` and
         cfg.artifactsDir.resolve("failures").getFileName.toString
       }.assert(name => assertTrue(name == "failures")),
     ),
+    section("Traces and video")(
+      md"""
+Opt-in via `ArtifactCapture` on `ChekhovConfig` (`Off`, `OnFailure`, or `Always`):
+
+```scala
+ChekhovConfig(
+  traceCapture = ArtifactCapture.Always,
+  videoCapture = ArtifactCapture.OnFailure,
+)
+```
+
+Traces land under `artifactsDir/traces`; videos under `artifactsDir/videos`. For
+`OnFailure`, also apply `ChekhovSuite.retainArtifactsOnFailure` so a failing test marks
+the session before the context closes.
+""",
+      exampleValue {
+        ArtifactCapture.fromString("on-failure")
+      }.assert(c => assertTrue(c.contains(ArtifactCapture.OnFailure))),
+    ),
   )
 end AlgebrasTour

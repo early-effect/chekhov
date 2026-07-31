@@ -32,7 +32,8 @@ Protocol YAML becomes a typed Scala AST; a Node driver speaks the channel; suite
 browser, context, and page as layers (plus optional Vite/static serve).
 
 This is a **multi-module toolkit**: pick the artifacts you need (`chekhov-core`,
-`chekhov-driver`, `chekhov-zio-test`, `chekhov-dom`, `chekhov-jsenv`, `sbt-chekhov`).
+`chekhov-driver`, `chekhov-zio-test`, `chekhov-dom`, `chekhov-ascent`, `chekhov-jsenv`,
+`sbt-chekhov`).
 """
       ),
       installSnippets = Vector(
@@ -50,6 +51,12 @@ addSbtPlugin("${m.organization}" % "sbt-chekhov" % "${m.version}")
 
 // build.sbt
 libraryDependencies += "${m.organization}" %%% "chekhov-dom" % "${m.version}" % Test
+Test / jsEnv := chekhovJSEnv.value
+""",
+        ),
+        CodeSnippet(
+          "Ascent + JSEnv",
+          s"""libraryDependencies += "${m.organization}" %%% "chekhov-ascent" % "${m.version}" % Test
 Test / jsEnv := chekhovJSEnv.value
 """,
         ),

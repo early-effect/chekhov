@@ -60,12 +60,32 @@ testid / role / CSS; `waitFor` polls until the node appears. Depend on
 `org.scala-js:::scalajs-dom` only (not ascent’s DOM facade).
 """
     ),
+    section("chekhov-ascent")(
+      md"""
+Ascent UI under JSEnv lives in **`chekhov-ascent`** (`ChekhovAscent.withMounted`), not
+core. It mounts into a `chekhov-dom` root and tears down via ascent’s subscription bag:
+
+```scala
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "<version>" % Test
+
+import chekhov.ascent.ChekhovAscent.withMounted
+import chekhov.dom.*
+
+withMounted(ui) { root =>
+  getByTestId("inc", root).click
+}
+```
+
+Use `chekhov-dom` alone when you do not need ascent.
+"""
+    ),
     section("Smoke in this repo")(
       md"""
 ```bash
 CHEKHOV_E2E=1 sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
 CHEKHOV_E2E=1 sbt jsenv-smoke/testFull
 CHEKHOV_E2E=1 sbt dom/testFull
+CHEKHOV_E2E=1 sbt ascent/testFull
 ```
 """,
       exampleValue {

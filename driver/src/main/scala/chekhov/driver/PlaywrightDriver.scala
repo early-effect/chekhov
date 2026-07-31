@@ -37,19 +37,46 @@ object PlaywrightDriver:
   end BrowserTypeService
 
   final case class BrowserLive(conn: ChannelConnection, guid: String) extends Browser:
-    def newContext(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, BrowserContext] =
+    def newContext(using Trace): ZIO[Scope & ChekhovConfig & ArtifactSession, ChekhovError, BrowserContext] =
       for
-        result  <- conn.send(guid, "newContext", Commands.BrowserNewContext())
+        config   <- ZIO.service[ChekhovConfig]
+        session  <- ZIO.service[ArtifactSession]
+        videoDir <- videoDirFor(config)
+        recordVideo = videoDir.map { dir =>
+          Json.Obj("dir" -> Json.Str(dir.toAbsolutePath.toString))
+        }
+        result  <- conn.send(guid, "newContext", Commands.BrowserNewContext(recordVideo = recordVideo))
         ctxGuid <- guidOf(result, "context")
-        ctx = BrowserContextLive(conn, ctxGuid)
-        _ <- ZIO.addFinalizer(ctx.close)
+        init    <- conn.awaitInitializer(ctxGuid)
+        tracing <- tracingGuidOf(init)
+        ctx = BrowserContextLive(
+          conn = conn,
+          guid = ctxGuid,
+          tracingGuid = tracing,
+          traceCapture = config.traceCapture,
+          videoCapture = config.videoCapture,
+          videoDir = videoDir,
+          artifactsDir = config.artifactsDir,
+          session = Some(session),
+        )
+        _ <- ZIO.when(config.traceCapture != ArtifactCapture.Off)(ctx.startTracing)
+        _ <- ZIO.addFinalizer(ctx.finalizeCapture.ignore *> ctx.close)
       yield ctx
 
     def close(using Trace): UIO[Unit] =
       conn.sendClose(guid, "close")
   end BrowserLive
 
-  final case class BrowserContextLive(conn: ChannelConnection, guid: String) extends BrowserContext:
+  final case class BrowserContextLive(
+      conn: ChannelConnection,
+      guid: String,
+      tracingGuid: String,
+      traceCapture: ArtifactCapture,
+      videoCapture: ArtifactCapture,
+      videoDir: Option[java.nio.file.Path],
+      artifactsDir: java.nio.file.Path,
+      session: Option[ArtifactSession],
+  ) extends BrowserContext:
     def newPage(using Trace): ZIO[Scope, ChekhovError, Page] =
       for
         result   <- conn.send(guid, "newPage", Commands.BrowserContextNewPage())
@@ -90,6 +117,44 @@ object PlaywrightDriver:
 
     def clearCookies(using Trace): IO[ChekhovError, Unit] =
       conn.send(guid, "clearCookies", Commands.BrowserContextClearCookies()).unit
+
+    def startTracing(using Trace): IO[ChekhovError, Unit] =
+      for
+        _ <- conn.send(
+          tracingGuid,
+          "tracingStart",
+          Commands.TracingStart(screenshots = Some(true), snapshots = Some(true)),
+        )
+        _ <- conn.send(tracingGuid, "tracingStartChunk", Commands.TracingStartChunk())
+      yield ()
+
+    def stopTracing(how: TraceStop)(using Trace): IO[ChekhovError, Unit] =
+      how.match
+        case TraceStop.Discard =>
+          conn.send(tracingGuid, "tracingStopChunk", Commands.TracingStopChunk(mode = "discard")).unit *>
+            conn.send(tracingGuid, "tracingStop", Commands.TracingStop()).unit
+        case TraceStop.Archive(path) =>
+          for
+            result <- conn.send(tracingGuid, "tracingStopChunk", Commands.TracingStopChunk(mode = "archive"))
+            _      <- saveArtifact(conn, result, path)
+            _      <- conn.send(tracingGuid, "tracingStop", Commands.TracingStop()).unit
+          yield ()
+
+    /** Finish opt-in capture for this context (called from the scope finalizer before close). */
+    def finalizeCapture(using Trace): IO[ChekhovError, Unit] =
+      for
+        keepTrace <- shouldKeepCapture(traceCapture, session)
+        _         <-
+          if traceCapture == ArtifactCapture.Off then ZIO.unit
+          else if keepTrace then
+            val path = artifactsDir
+              .resolve("traces")
+              .resolve(s"${java.lang.System.currentTimeMillis()}-trace.zip")
+            stopTracing(TraceStop.Archive(path))
+          else stopTracing(TraceStop.Discard)
+        keepVideo <- shouldKeepCapture(videoCapture, session)
+        _         <- finalizeVideoDir(videoDir, videoCapture, keepVideo, artifactsDir)
+      yield ()
 
     def close(using Trace): UIO[Unit] =
       conn.sendClose(guid, "close")
@@ -251,6 +316,108 @@ object PlaywrightDriver:
       }
       .orElseFail(ChekhovError.Protocol(s"Page initializer missing mainFrame.guid: $pageInitializer"))
 
+  private def tracingGuidOf(contextInitializer: Json): IO[ChekhovError, String] =
+    ZIO
+      .fromOption {
+        contextInitializer.asObject
+          .flatMap(_.get("tracing"))
+          .flatMap(_.asObject)
+          .flatMap(_.get("guid"))
+          .flatMap(_.asString)
+      }
+      .orElseFail(ChekhovError.Protocol(s"BrowserContext initializer missing tracing.guid: $contextInitializer"))
+
+  private def videoDirFor(config: ChekhovConfig): UIO[Option[java.nio.file.Path]] =
+    config.videoCapture match
+      case ArtifactCapture.Off    => ZIO.succeed(None)
+      case ArtifactCapture.Always =>
+        val dir = config.artifactsDir.resolve("videos")
+        ZIO.attempt(java.nio.file.Files.createDirectories(dir)).orDie.as(Some(dir))
+      case ArtifactCapture.OnFailure =>
+        val dir = config.artifactsDir.resolve("videos").resolve(s".staging-${java.util.UUID.randomUUID()}")
+        ZIO.attempt(java.nio.file.Files.createDirectories(dir)).orDie.as(Some(dir))
+
+  private def shouldKeepCapture(mode: ArtifactCapture, session: Option[ArtifactSession])(using Trace): UIO[Boolean] =
+    mode match
+      case ArtifactCapture.Off       => ZIO.succeed(false)
+      case ArtifactCapture.Always    => ZIO.succeed(true)
+      case ArtifactCapture.OnFailure =>
+        session.match
+          case Some(s) => s.shouldKeep(mode)
+          case None    => ZIO.succeed(false)
+
+  private def finalizeVideoDir(
+      videoDir: Option[java.nio.file.Path],
+      mode: ArtifactCapture,
+      keep: Boolean,
+      artifactsDir: java.nio.file.Path,
+  ): IO[ChekhovError, Unit] =
+    videoDir.match
+      case None      => ZIO.unit
+      case Some(dir) =>
+        mode.match
+          case ArtifactCapture.Off    => ZIO.unit
+          case ArtifactCapture.Always =>
+            ZIO.unit // Playwright already wrote under artifactsDir/videos
+          case ArtifactCapture.OnFailure =>
+            if keep then
+              val dest = artifactsDir.resolve("videos")
+              ZIO
+                .attempt {
+                  java.nio.file.Files.createDirectories(dest)
+                  if java.nio.file.Files.isDirectory(dir) then
+                    val stream = java.nio.file.Files.list(dir)
+                    try
+                      stream.forEach { src =>
+                        val name = src.getFileName.toString
+                        java.nio.file.Files.move(
+                          src,
+                          dest.resolve(s"${java.lang.System.currentTimeMillis()}-$name"),
+                          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        )
+                      }
+                    finally stream.close()
+                    end try
+                  end if
+                  deleteRecursively(dir)
+                }
+                .mapError(e => ChekhovError.Driver(s"Failed to promote video dir $dir: $e", Some(e)))
+                .unit
+            else
+              ZIO
+                .attempt(deleteRecursively(dir))
+                .mapError(e => ChekhovError.Driver(s"Failed to discard video dir $dir: $e", Some(e)))
+                .unit
+
+  private def deleteRecursively(path: java.nio.file.Path): Unit =
+    if java.nio.file.Files.isDirectory(path) then
+      val stream = java.nio.file.Files.list(path)
+      try stream.forEach(deleteRecursively)
+      finally stream.close()
+    java.nio.file.Files.deleteIfExists(path)
+    ()
+
+  private def saveArtifact(
+      conn: ChannelConnection,
+      result: Json,
+      path: java.nio.file.Path,
+  )(using Trace): IO[ChekhovError, Unit] =
+    for
+      artifactGuid <- ZIO
+        .fromOption {
+          result.asObject
+            .flatMap(_.get("artifact"))
+            .flatMap(_.asObject)
+            .flatMap(_.get("guid"))
+            .flatMap(_.asString)
+        }
+        .orElseFail(ChekhovError.Protocol(s"tracingStopChunk missing artifact.guid: $result"))
+      _ <- ZIO
+        .attempt(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_)))
+        .mapError(e => ChekhovError.Driver(s"Failed to create parent for $path: $e", Some(e)))
+      _ <- conn.send(artifactGuid, "saveAs", Commands.ArtifactSaveAs(path = path.toAbsolutePath.toString)).unit
+    yield ()
+
   private def guidOf(result: Json, field: String): IO[ChekhovError, String] =
     ZIO
       .fromOption {
@@ -360,13 +527,17 @@ object PlaywrightDriver:
   val browserLayer: ZLayer[ChekhovConfig & BrowserType, ChekhovError, Browser] =
     ZLayer.scoped(ZIO.serviceWithZIO[BrowserType](_.launch))
 
-  val contextLayer: ZLayer[ChekhovConfig & Browser, ChekhovError, BrowserContext] =
+  val contextLayer: ZLayer[ChekhovConfig & ArtifactSession & Browser, ChekhovError, BrowserContext] =
     ZLayer.scoped(ZIO.serviceWithZIO[Browser](_.newContext))
 
   val pageLayer: ZLayer[BrowserContext, ChekhovError, Page] =
     ZLayer.scoped(ZIO.serviceWithZIO[BrowserContext](_.newPage))
 
-  /** Common suite stack: config in → BrowserType + Browser + BrowserContext + Page out. */
-  val suiteLayers: ZLayer[ChekhovConfig, ChekhovError, BrowserType & Browser & BrowserContext & Page] =
-    withBrowserType >+> browserLayer >+> contextLayer >+> pageLayer
+  /** Common suite stack: config in → session + BrowserType + Browser + BrowserContext + Page out. */
+  val suiteLayers: ZLayer[
+    ChekhovConfig,
+    ChekhovError,
+    ArtifactSession & BrowserType & Browser & BrowserContext & Page,
+  ] =
+    ArtifactSession.live >+> (withBrowserType >+> browserLayer >+> contextLayer >+> pageLayer)
 end PlaywrightDriver

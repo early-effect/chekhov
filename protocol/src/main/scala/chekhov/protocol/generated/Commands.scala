@@ -39,6 +39,11 @@ object Commands:
     ("Page", "keyboardPress", "PageKeyboardPress"),
     ("Page", "screenshot", "PageScreenshot"),
     ("Page", "close", "PageClose"),
+    ("Tracing", "tracingStart", "TracingStart"),
+    ("Tracing", "tracingStartChunk", "TracingStartChunk"),
+    ("Tracing", "tracingStopChunk", "TracingStopChunk"),
+    ("Tracing", "tracingStop", "TracingStop"),
+    ("Artifact", "saveAs", "ArtifactSaveAs"),
   )
 
   final case class Initialize(
@@ -244,6 +249,31 @@ object Commands:
 
   final case class PageClose(
       reason: Option[String] = None
+  ) derives JsonCodec
+
+  final case class TracingStart(
+      live: Option[Boolean] = None,
+      name: Option[String] = None,
+      screenshots: Option[Boolean] = None,
+      snapshots: Option[Boolean] = None,
+  ) derives JsonCodec
+
+  final case class TracingStartChunk(
+      name: Option[String] = None,
+      title: Option[String] = None,
+  ) derives JsonCodec
+
+  final case class TracingStopChunk(
+      mode: String
+  ) derives JsonCodec
+
+  final case class TracingStop()
+
+  object TracingStop:
+    given JsonCodec[TracingStop] = emptyCodec(TracingStop())
+
+  final case class ArtifactSaveAs(
+      path: String
   ) derives JsonCodec
 
   private def emptyCodec[A](value: A): JsonCodec[A] =

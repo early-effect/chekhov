@@ -28,6 +28,20 @@ object TodoSpec extends ChekhovSuite:
   )
 ```
 
+Scala.js ascent component suite (JSEnv):
+
+```scala
+import chekhov.ascent.ChekhovAscent.withMounted
+import chekhov.dom.*
+import ascent.*, ascent.dsl.*
+import zio.test.*
+
+withMounted(ui) { root =>
+  getByTestId("inc", root).click *>
+    getByTestId("count", root).innerText.map(t => assertTrue(t == "1"))
+}
+```
+
 ## Modules
 
 | Module | Artifact | Role |
@@ -37,6 +51,7 @@ object TodoSpec extends ChekhovSuite:
 | `driver` | `chekhov-driver` | Channel interpreter (`PlaywrightDriver` layers) |
 | `zio-test` | `chekhov-zio-test` | `ChekhovSuite`, multi-browser helpers |
 | `dom` | `chekhov-dom` | Scala.js in-page helpers (`withRoot`, waits, testid/role/CSS) |
+| `ascent` | `chekhov-ascent` | `withMounted` bridge for ascent UI + `chekhov-dom` (JSEnv) |
 | `jsenv` | `chekhov-jsenv` | Playwright-backed `ChekhovJSEnv` (scripts in a real browser page) |
 | `sbt-chekhov` | `sbt-chekhov` | Artifact dir / browser props + `chekhovInstall` |
 
@@ -59,12 +74,37 @@ libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "<version>" % Tes
 addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
 ```
 
+Ascent component tests (pulls `chekhov-dom` transitively):
+
+```scala
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "<version>" % Test
+```
+
 ```scala
 import chekhov.sbt.ChekhovPlugin.autoImport.*
 // or: import chekhov.jsenv.ChekhovJSEnv
 
 Test / jsEnv := chekhovJSEnv.value
 // equivalent: Test / jsEnv := ChekhovJSEnv()
+```
+
+### Artifacts
+
+Default `artifactsDir` is `target/chekhov` (override with `-Dchekhov.artifactsDir` / `CHEKHOV_ARTIFACTS_DIR`):
+
+| Path | Contents |
+|------|----------|
+| `failures/` | PNGs from `ChekhovSuite.screenshotOnFailure` |
+| `traces/` | Playwright trace zips when `traceCapture` is `Always` or kept `OnFailure` |
+| `videos/` | Recorded videos when `videoCapture` is `Always` or kept `OnFailure` |
+| `serve/` | Scoped Vite/static serve logs |
+
+```scala
+ChekhovConfig(
+  traceCapture = ArtifactCapture.Always,   // Off | OnFailure | Always
+  videoCapture = ArtifactCapture.OnFailure,
+)
+// For OnFailure, also: suite(...)(...) @@ ChekhovSuite.retainArtifactsOnFailure
 ```
 
 Local browsers / E2E:

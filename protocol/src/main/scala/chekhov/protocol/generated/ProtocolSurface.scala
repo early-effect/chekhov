@@ -10,6 +10,8 @@ object ProtocolSurface:
     "BrowserContext",
     "Page",
     "Frame",
+    "Tracing",
+    "Artifact",
   )
 
   val commands: Map[String, Set[String]] = Map(
@@ -180,6 +182,17 @@ object ProtocolSurface:
       "waitForSelector",
       "waitForTimeout",
     ),
+    "Tracing" -> Set(
+      "harExport",
+      "harStart",
+      "tracingGroup",
+      "tracingGroupEnd",
+      "tracingStart",
+      "tracingStartChunk",
+      "tracingStop",
+      "tracingStopChunk",
+    ),
+    "Artifact" -> Set("cancel", "delete", "failure", "pathAfterFinished", "saveAs", "saveAsStream", "stream"),
   )
 
   def has(channel: String, method: String): Boolean =

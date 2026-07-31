@@ -10,11 +10,15 @@ import java.nio.file.{Files, Path}
 /** Specular/saferis-shaped suite: scoped Playwright driver + page, artifacts under target/chekhov. */
 trait ChekhovSuite extends ZIOSpecDefault:
 
-  /** Override to customize config (browser, baseUrl, artifactsDir). */
+  /** Override to customize config (browser, baseUrl, artifactsDir, trace/video capture). */
   def chekhovConfig: ChekhovConfig = ChekhovConfig()
 
-  /** Layers provided to every test: config, browser type, shared browser, context, fresh page. */
-  def chekhovLayer: ZLayer[Any, ChekhovError, ChekhovConfig & BrowserType & Browser & BrowserContext & Page] =
+  /** Layers provided to every test: config, artifact session, browser type, shared browser, context, fresh page. */
+  def chekhovLayer: ZLayer[
+    Any,
+    ChekhovError,
+    ChekhovConfig & ArtifactSession & BrowserType & Browser & BrowserContext & Page,
+  ] =
     ZLayer.succeed(chekhovConfig) >>> ChekhovSuite.fullStack
 
   override def aspects =
@@ -30,7 +34,7 @@ object ChekhovSuite:
   val fullStack: ZLayer[
     ChekhovConfig,
     ChekhovError,
-    ChekhovConfig & BrowserType & Browser & BrowserContext & Page,
+    ChekhovConfig & ArtifactSession & BrowserType & Browser & BrowserContext & Page,
   ] =
     ZLayer.service[ChekhovConfig] ++ PlaywrightDriver.suiteLayers
 
@@ -43,6 +47,16 @@ object ChekhovSuite:
 
   def ensureArtifactsDir(dir: Path): UIO[Path] =
     ZIO.attempt(Files.createDirectories(dir)).orDie.as(dir)
+
+  /** Apply when [[ChekhovConfig.traceCapture]] / [[ChekhovConfig.videoCapture]] is [[ArtifactCapture.OnFailure]] so
+    * failures keep artifacts (`suite(...)(...) @@ retainArtifactsOnFailure`).
+    */
+  val retainArtifactsOnFailure: TestAspect[Nothing, ArtifactSession, Nothing, Any] =
+    new TestAspect.PerTest.AtLeastR[ArtifactSession]:
+      def perTest[R <: ArtifactSession, E](
+          test: ZIO[R, TestFailure[E], TestSuccess]
+      )(using Trace) =
+        test.tapError(_ => ArtifactSession.markFailed.ignore)
 
   /** On failure, write `artifactsDir/failures/<timestamp>-<label>.png` when Page + ChekhovConfig are in scope. */
   def screenshotOnFailure(label: String = "failure"): TestAspect[Nothing, Page & ChekhovConfig, Nothing, Any] =
