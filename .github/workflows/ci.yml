@@ -99,6 +99,12 @@ jobs:
             ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.epoch }}-
             ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.release }}-
             ubuntu-latest-jdk25-sbt-
+      - name: Cache Playwright apt packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/chekhov-apt-archives
+          key: ${{ runner.os }}-chekhov-apt-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-chekhov-apt-
       - name: Set up Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
@@ -113,9 +119,21 @@ jobs:
       - name: Install Playwright browsers
         run: |
           set -euo pipefail
+          apt_mirror="${HOME}/.cache/chekhov-apt-archives"
+          mkdir -p "${apt_mirror}"
+          sudo mkdir -p /var/cache/apt/archives/partial
+          if ls "${apt_mirror}"/*.deb >/dev/null 2>&1; then
+            echo "Seeding apt archives from ${apt_mirror} ($(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs)"
+            sudo cp -n "${apt_mirror}"/*.deb /var/cache/apt/archives/ || true
+          fi
           mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
           chmod +x ./scripts/install-browsers.sh
           ./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
+          if ls /var/cache/apt/archives/*.deb >/dev/null 2>&1; then
+            sudo cp -n /var/cache/apt/archives/*.deb "${apt_mirror}/" || true
+            sudo chown -R "$(id -u):$(id -g)" "${apt_mirror}"
+            echo "Apt mirror now has $(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs"
+          fi
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
 
       - name: cache-rehydrate
@@ -182,6 +200,12 @@ jobs:
             ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.epoch }}-
             ubuntu-latest-jdk25-sbt-${{ steps.cache-epoch.outputs.release }}-
             ubuntu-latest-jdk25-sbt-
+      - name: Cache Playwright apt packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/chekhov-apt-archives
+          key: ${{ runner.os }}-chekhov-apt-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-chekhov-apt-
       - name: Set up Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
@@ -196,9 +220,21 @@ jobs:
       - name: Install Playwright browsers
         run: |
           set -euo pipefail
+          apt_mirror="${HOME}/.cache/chekhov-apt-archives"
+          mkdir -p "${apt_mirror}"
+          sudo mkdir -p /var/cache/apt/archives/partial
+          if ls "${apt_mirror}"/*.deb >/dev/null 2>&1; then
+            echo "Seeding apt archives from ${apt_mirror} ($(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs)"
+            sudo cp -n "${apt_mirror}"/*.deb /var/cache/apt/archives/ || true
+          fi
           mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
           chmod +x ./scripts/install-browsers.sh
           ./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
+          if ls /var/cache/apt/archives/*.deb >/dev/null 2>&1; then
+            sudo cp -n /var/cache/apt/archives/*.deb "${apt_mirror}/" || true
+            sudo chown -R "$(id -u):$(id -g)" "${apt_mirror}"
+            echo "Apt mirror now has $(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs"
+          fi
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
 
       - name: test

@@ -46,8 +46,18 @@ usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
 val ciVerify =
   "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
 
-val chekhovBrowserSetup: StepContext => List[Step] = _ =>
+val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
   List(
+    Step(
+      name = Some("Cache Playwright apt packages"),
+      uses = Some(ctx.actions.cache),
+      `with` = ListMap(
+        // User-writable mirror of /var/cache/apt/archives (needs sudo to seed apt).
+        "path"         -> "~/.cache/chekhov-apt-archives",
+        "key"          -> "${{ runner.os }}-chekhov-apt-${{ hashFiles('package-lock.json') }}",
+        "restore-keys" -> "${{ runner.os }}-chekhov-apt-",
+      ),
+    ),
     Step(
       name = Some("Set up Node"),
       uses = Some("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"), // v6.4.0
@@ -68,15 +78,27 @@ val chekhovBrowserSetup: StepContext => List[Step] = _ =>
       name = Some("npm ci (ascent fixture)"),
       run = Some("npm ci --prefix examples/ascent-fixture"),
     ),
-    // Browsers install under target/ms-playwright (PLAYWRIGHT_BROWSERS_PATH via zipxEnv)
-    // so they ride the zipx LocalDir "Cache sbt" key (path already includes `target`).
+    // Browsers under target/ms-playwright (zipxEnv) ride LocalDir; apt .debs are mirrored
+    // into ~/.cache/chekhov-apt-archives so install-deps can reuse them across runs.
     Step(
       name = Some("Install Playwright browsers"),
       run = Some(
         """|set -euo pipefail
+           |apt_mirror="${HOME}/.cache/chekhov-apt-archives"
+           |mkdir -p "${apt_mirror}"
+           |sudo mkdir -p /var/cache/apt/archives/partial
+           |if ls "${apt_mirror}"/*.deb >/dev/null 2>&1; then
+           |  echo "Seeding apt archives from ${apt_mirror} ($(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs)"
+           |  sudo cp -n "${apt_mirror}"/*.deb /var/cache/apt/archives/ || true
+           |fi
            |mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
            |chmod +x ./scripts/install-browsers.sh
            |./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
+           |if ls /var/cache/apt/archives/*.deb >/dev/null 2>&1; then
+           |  sudo cp -n /var/cache/apt/archives/*.deb "${apt_mirror}/" || true
+           |  sudo chown -R "$(id -u):$(id -g)" "${apt_mirror}"
+           |  echo "Apt mirror now has $(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs"
+           |fi
            |echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
            |""".stripMargin
       ),
