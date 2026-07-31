@@ -199,11 +199,12 @@ Still curated (not generated from YAML field lists):
 - Hub catalog entry (`catalog-urls.txt` → earlyeffect.rocks)
 - `Page.screenshot` + `ChekhovSuite.screenshotOnFailure` (PNG under `artifactsDir/failures`)
 - Publish-friendly `chekhovJSEnv` via `sbt-chekhov` (see Phase 2)
+- Specular consumer guide: Quickstart, Browsers and E2E, Serving the app, JSEnv and chekhov-dom, Algebras tour, Contributing
 
 ### Next
 
-- Traces / video under `artifactsDir`
 - First `v*` Central release (clears docs `0.0.0-ci` / `v<version>` display)
+- Traces / video under `artifactsDir`
 - README polish as the surface grows
 
 ---

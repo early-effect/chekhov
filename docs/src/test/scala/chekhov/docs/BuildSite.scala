@@ -9,7 +9,14 @@ import java.nio.file.Path
 /** Docs-as-tests site builder (Test classpath; `docs/specularSite`). */
 object BuildSite extends DocsSite:
 
-  def pages = Vector(GettingStarted.doc)
+  def pages = Vector(
+    Quickstart.doc,
+    BrowsersAndE2E.doc,
+    ServingTheApp.doc,
+    JsEnvAndDom.doc,
+    AlgebrasTour.doc,
+    Contributing.doc,
+  )
 
   // Meta comes from published `core` (`chekhov-core`); hub card / chrome use the toolkit name.
   override def meta: ProjectMeta =
