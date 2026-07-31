@@ -42,14 +42,32 @@ object TodoSpec extends ChekhovSuite:
 
 ## Install
 
+Suite stack (JVM):
+
 ```scala
 libraryDependencies ++= Seq(
   "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
+  "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
 )
-// optional JSEnv / DOM
+```
+
+Scala.js DOM helpers and real-browser JSEnv:
+
+```scala
 libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "<version>" % Test
+// project/plugins.sbt — pulls chekhov-jsenv onto the sbt classpath
 addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
 ```
+
+```scala
+import chekhov.sbt.ChekhovPlugin.autoImport.*
+// or: import chekhov.jsenv.ChekhovJSEnv
+
+Test / jsEnv := chekhovJSEnv.value
+// equivalent: Test / jsEnv := ChekhovJSEnv()
+```
+
+Local browsers / E2E:
 
 ```bash
 npm ci
@@ -57,7 +75,7 @@ npm ci --prefix examples/vite-fixture
 npm ci --prefix examples/ascent-fixture
 ./scripts/install-browsers.sh   # or: npm run playwright:install
 export CHEKHOV_E2E=1
-sbt test
+sbt testFull
 ```
 
 Browsers land in Playwright’s default OS cache (`~/.cache/ms-playwright` on Linux,
@@ -180,19 +198,25 @@ driver / browser install as the JVM client). Materializes `Input.Script` /
 `Input.ESModule` onto a localhost page and bridges `scalajsCom` via frame
 `evaluateExpression`.
 
-```scala
-import chekhov.jsenv.ChekhovJSEnv
-import org.scalajs.jsenv.JSEnv
+**Consumers (published artifacts):** add `sbt-chekhov` (brings `chekhov-jsenv` onto the
+sbt classpath) and set:
 
-Test / jsEnv := ChekhovJSEnv() // or ChekhovJSEnv(ChekhovBrowser.Firefox)
+```scala
+Test / jsEnv := chekhovJSEnv.value
+// or: Test / jsEnv := chekhov.jsenv.ChekhovJSEnv()
+// or: Test / jsEnv := ChekhovJSEnv(ChekhovBrowser.Firefox)
 ```
+
+Use `ModuleKind.ESModule` (or ensure scripts are materializable) for linked test
+output. This repo’s `jsenv-smoke` / `dom` projects still use an internal classpath
+bridge so the monorepo need not publish to exercise CI.
 
 Live smoke (from this repo, with browsers installed):
 
 ```bash
 CHEKHOV_E2E=1 sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
-CHEKHOV_E2E=1 sbt jsenv-smoke/test   # Scala.js assertTrue via ChekhovJSEnv
-CHEKHOV_E2E=1 sbt dom/test           # chekhov-dom helpers in Chromium
+CHEKHOV_E2E=1 sbt jsenv-smoke/testFull
+CHEKHOV_E2E=1 sbt dom/testFull
 ```
 
 ## Engines

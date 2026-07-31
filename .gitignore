@@ -44,5 +44,8 @@ build.sbt.semanticdb
 
 node_modules/
 
+# Vite caches
+examples/*/.vite/
+
 # Ascent fixture: Vite plugin marker (written by sbt before driver tests)
 examples/ascent-fixture/scalajs-out-dir

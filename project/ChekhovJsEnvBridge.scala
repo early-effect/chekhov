@@ -8,7 +8,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import scala.util.control.NonFatal
 
-/** Lazy JSEnv for build.sbt: loads `chekhov.jsenv.ChekhovJSEnv` from a classpath file written by a task. */
+/** Lazy JSEnv for this monorepo's build.sbt only.
+  *
+  * Loads `chekhov.jsenv.ChekhovJSEnv` from a classpath file written by `writeJsenvClasspath`.
+  * Published consumers should depend on `chekhov-jsenv` (or `sbt-chekhov`) and use
+  * `Test / jsEnv := ChekhovJSEnv()` / `chekhovJSEnv.value` instead.
+  */
 final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
 
   val name: String = "ChekhovJsEnvBridge"

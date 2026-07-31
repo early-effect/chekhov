@@ -285,13 +285,12 @@ lazy val dom = (project in file("dom"))
       val enabled =
         sys.env.get("CHEKHOV_E2E").contains("1") ||
           sys.props.get("chekhov.e2e").contains("1")
-      if (enabled) then {
-        (Test / definedTests).value
-      }
+      if enabled then (Test / definedTests).value
       else
         streams.value.log.info("chekhov-dom tests skipped (set CHEKHOV_E2E=1 or -Dchekhov.e2e=1)")
-      Seq.empty
+        Seq.empty
     },
+    // Monorepo only: load ChekhovJSEnv via classpath file (consumers use chekhovJSEnv / ChekhovJSEnv()).
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
@@ -335,7 +334,8 @@ lazy val `jsenv-smoke` = (project in file("examples/jsenv-smoke"))
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
     ),
     Test / mainClass := None,
-    Test / jsEnv     := Def.uncached {
+    // Monorepo only: see ChekhovJsEnvBridge. Consumers: Test / jsEnv := ChekhovJSEnv().
+    Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
     },
@@ -343,6 +343,7 @@ lazy val `jsenv-smoke` = (project in file("examples/jsenv-smoke"))
 
 lazy val `sbt-chekhov` = (project in file("sbt-chekhov"))
   .enablePlugins(SbtPlugin)
+  .dependsOn(jsenv)
   .settings(
     name := "sbt-chekhov",
     scalacOptions ++= commonScalacOptions,
