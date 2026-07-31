@@ -5,8 +5,8 @@ import zio.json.ast.Json
 
 /** Typed channel command params for the Chekhov interpreter.
   *
-  * Generated from protocol.yml via ProtocolCodegen.commandAllowlist.
-  * Do not edit field lists by hand; run `sbt pwCodegen` / `pwBump`.
+  * Generated from protocol.yml via ProtocolCodegen.commandAllowlist. Do not edit field lists by hand; run
+  * `sbt pwCodegen` / `pwBump`.
   */
 object Commands:
 
@@ -43,13 +43,12 @@ object Commands:
     ("Tracing", "tracingStartChunk", "TracingStartChunk"),
     ("Tracing", "tracingStopChunk", "TracingStopChunk"),
     ("Tracing", "tracingStop", "TracingStop"),
-    ("Artifact", "saveAs", "ArtifactSaveAs")
+    ("Artifact", "saveAs", "ArtifactSaveAs"),
   )
 
   final case class Initialize(
       sdkLanguage: String
   ) derives JsonCodec
-
 
   final case class BrowserTypeLaunch(
       args: Option[Json] = None,
@@ -69,9 +68,8 @@ object Commands:
       ignoreDefaultArgs: Option[Json] = None,
       proxy: Option[Json] = None,
       slowMo: Option[Double] = None,
-      tracesDir: Option[String] = None
+      tracesDir: Option[String] = None,
   ) derives JsonCodec
-
 
   final case class BrowserNewContext(
       acceptDownloads: Option[String] = None,
@@ -104,46 +102,38 @@ object Commands:
       testIdAttributeName: Option[String] = None,
       timezoneId: Option[String] = None,
       userAgent: Option[String] = None,
-      viewport: Option[Json] = None
+      viewport: Option[Json] = None,
   ) derives JsonCodec
-
 
   final case class BrowserClose(
       reason: Option[String] = None
   ) derives JsonCodec
-
 
   final case class BrowserContextNewPage()
 
   object BrowserContextNewPage:
     given JsonCodec[BrowserContextNewPage] = emptyCodec(BrowserContextNewPage())
 
-
   final case class BrowserContextClose(
       reason: Option[String] = None
   ) derives JsonCodec
 
-
   final case class BrowserContextStorageState(
       credentials: Option[Boolean] = None,
-      indexedDB: Option[Boolean] = None
+      indexedDB: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class BrowserContextSetStorageState(
       storageState: Option[Json] = None
   ) derives JsonCodec
 
-
   final case class BrowserContextCookies(
       urls: Json
   ) derives JsonCodec
 
-
   final case class BrowserContextAddCookies(
       cookies: Json
   ) derives JsonCodec
-
 
   final case class BrowserContextClearCookies(
       domain: Option[String] = None,
@@ -154,16 +144,14 @@ object Commands:
       nameRegexSource: Option[String] = None,
       path: Option[String] = None,
       pathRegexFlags: Option[String] = None,
-      pathRegexSource: Option[String] = None
+      pathRegexSource: Option[String] = None,
   ) derives JsonCodec
-
 
   final case class PageGoto(
       url: String,
       referer: Option[String] = None,
-      waitUntil: Option[String] = None
+      waitUntil: Option[String] = None,
   ) derives JsonCodec
-
 
   final case class PageClick(
       selector: String,
@@ -177,86 +165,73 @@ object Commands:
       scroll: Option[String] = None,
       steps: Option[Double] = None,
       strict: Option[Boolean] = None,
-      trial: Option[Boolean] = None
+      trial: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PageFill(
       selector: String,
       value: String,
       force: Option[Boolean] = None,
-      strict: Option[Boolean] = None
+      strict: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PagePress(
       key: String,
       selector: String,
       delay: Option[Double] = None,
       noWaitAfter: Option[Boolean] = None,
-      strict: Option[Boolean] = None
+      strict: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PageInnerText(
       selector: String,
-      strict: Option[Boolean] = None
+      strict: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PageTextContent(
       selector: String,
-      strict: Option[Boolean] = None
+      strict: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PageTitle()
 
   object PageTitle:
     given JsonCodec[PageTitle] = emptyCodec(PageTitle())
 
-
   final case class FrameEvaluateExpression(
       arg: Json,
       expression: String,
-      isFunction: Option[Boolean] = None
+      isFunction: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class PageWebStorageItems(
       kind: String
   ) derives JsonCodec
 
-
   final case class PageWebStorageGetItem(
       kind: String,
-      name: String
+      name: String,
   ) derives JsonCodec
-
 
   final case class PageWebStorageSetItem(
       kind: String,
       name: String,
-      value: String
+      value: String,
   ) derives JsonCodec
-
 
   final case class PageWebStorageRemoveItem(
       kind: String,
-      name: String
+      name: String,
   ) derives JsonCodec
-
 
   final case class PageWebStorageClear(
       kind: String
   ) derives JsonCodec
 
-
   final case class PageKeyboardPress(
       key: String,
-      delay: Option[Double] = None
+      delay: Option[Double] = None,
   ) derives JsonCodec
-
 
   final case class PageScreenshot(
       animations: Option[String] = None,
@@ -269,44 +244,37 @@ object Commands:
       quality: Option[Double] = None,
       scale: Option[String] = None,
       style: Option[String] = None,
-      `type`: Option[String] = None
+      `type`: Option[String] = None,
   ) derives JsonCodec
-
 
   final case class PageClose(
       reason: Option[String] = None
   ) derives JsonCodec
 
-
   final case class TracingStart(
       live: Option[Boolean] = None,
       name: Option[String] = None,
       screenshots: Option[Boolean] = None,
-      snapshots: Option[Boolean] = None
+      snapshots: Option[Boolean] = None,
   ) derives JsonCodec
-
 
   final case class TracingStartChunk(
       name: Option[String] = None,
-      title: Option[String] = None
+      title: Option[String] = None,
   ) derives JsonCodec
-
 
   final case class TracingStopChunk(
       mode: String
   ) derives JsonCodec
-
 
   final case class TracingStop()
 
   object TracingStop:
     given JsonCodec[TracingStop] = emptyCodec(TracingStop())
 
-
   final case class ArtifactSaveAs(
       path: String
   ) derives JsonCodec
-
 
   private def emptyCodec[A](value: A): JsonCodec[A] =
     JsonCodec(
