@@ -121,12 +121,14 @@ callers since zipx 0.1.3) set to `target/ms-playwright` so browsers land under t
 LocalDir `target` path and share the **same** sbt `actions/cache` key (epoch +
 `run_id`). Mid-PR pushes reuse that key. After merge, Verify is skipped;
 `cache-rehydrate` runs the same browser `extraSteps` plus `compile` so `main`
-saves digests **and** browsers for the next PR. After a `pwBump`, install may
-fetch new revisions once. Commit `package-lock.json` with the bump.
-`zipxWorkflowCheck` is part of `sbt ci` so `build.sbt` setup steps cannot drift
-from `.github/workflows/ci.yml`. Regenerate with `sbt zipxWorkflowGenerate` only
-when you change zipx settings (Node version, browser env, etc.), not on every
-Playwright pin bump.
+saves digests **and** browsers for the next PR. Linux CI also caches Playwright
+`install-deps` `.deb`s under `~/.cache/chekhov-apt-archives` (keyed on
+`package-lock.json`) so apt mostly reuses local archives. After a `pwBump`,
+install may fetch new browser/apt revisions once. Commit `package-lock.json`
+with the bump. `zipxWorkflowCheck` is part of `sbt ci` so `build.sbt` setup
+steps cannot drift from `.github/workflows/ci.yml`. Regenerate with
+`sbt zipxWorkflowGenerate` only when you change zipx settings (Node version,
+browser env, etc.), not on every Playwright pin bump.
 
 **Granular tasks:**
 
