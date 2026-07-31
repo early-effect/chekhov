@@ -1,0 +1,126 @@
+package chekhov
+
+import zio.*
+
+import java.nio.file.{Files, Path}
+import scala.jdk.CollectionConverters.*
+
+/** Configuration for a scoped subprocess that serves the app under test. */
+final case class ServeConfig(
+    command: List[String],
+    cwd: Path,
+    readyUrl: String,
+    readyTimeout: Duration = 120.seconds,
+    env: Map[String, String] = Map.empty,
+)
+
+/** Capability: a running server whose lifecycle is owned by Scope. */
+trait AppServer:
+  def baseUrl: String
+
+object AppServer:
+
+  /** Start a process, wait until `readyUrl` responds, kill on scope exit. */
+  def serve(config: ServeConfig)(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, AppServer] =
+    for
+      chekhov <- ZIO.service[ChekhovConfig]
+      _       <- ZIO.attempt(Files.createDirectories(chekhov.artifactsDir.resolve("serve"))).orDie
+      logFile = chekhov.artifactsDir.resolve("serve").resolve(s"serve-${java.lang.System.currentTimeMillis()}.log")
+      process <- ZIO.acquireRelease {
+        ZIO
+          .attemptBlocking {
+            val pb = new ProcessBuilder(config.command.asJava)
+            pb.directory(config.cwd.toFile)
+            pb.redirectErrorStream(true)
+            pb.redirectOutput(logFile.toFile)
+            config.env.foreach { case (k, v) => pb.environment().put(k, v) }
+            pb.start()
+          }
+          .mapError(e => ChekhovError.Serve(s"Failed to start ${config.command.mkString(" ")}", Some(e)))
+      } { p =>
+        ZIO.attemptBlocking {
+          p.destroy()
+          if !p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) then p.destroyForcibly()
+        }.orDie
+      }
+      _ <- waitUntilReady(config.readyUrl, config.readyTimeout, process, logFile)
+    yield new AppServer:
+      val baseUrl = config.readyUrl
+
+  def vite(
+      dir: Path,
+      port: Int = 5173,
+      command: List[String] = List("npm", "run", "dev"),
+      env: Map[String, String] = Map.empty,
+  )(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, AppServer] =
+    // `--open false` is a path, not a boolean; config often has open: true
+    val withPort =
+      if command == List("npm", "run", "dev") then
+        command ++ List(
+          "--",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          port.toString,
+          "--strictPort",
+          "--open=false",
+        )
+      else command
+    serve(
+      ServeConfig(
+        command = withPort,
+        cwd = dir,
+        readyUrl = s"http://127.0.0.1:$port",
+        env = Map("BROWSER" -> "none") ++ env,
+      )
+    )
+  end vite
+
+  def layer(config: ServeConfig): ZLayer[ChekhovConfig, ChekhovError, AppServer] =
+    ZLayer.scoped(serve(config))
+
+  def viteLayer(
+      dir: Path,
+      port: Int = 5173,
+      env: Map[String, String] = Map.empty,
+  ): ZLayer[ChekhovConfig, ChekhovError, AppServer] =
+    ZLayer.scoped(vite(dir, port, env = env))
+
+  private def waitUntilReady(url: String, timeout: Duration, process: Process, logFile: Path)(using
+      Trace
+  ): IO[ChekhovError, Unit] =
+    def attempt: UIO[Boolean] =
+      ZIO
+        .attemptBlocking {
+          val conn = java.net.URI.create(url).toURL.openConnection().asInstanceOf[java.net.HttpURLConnection]
+          conn.setConnectTimeout(500)
+          conn.setReadTimeout(500)
+          conn.setRequestMethod("GET")
+          try
+            conn.getResponseCode
+            true
+          catch case _: Throwable => false
+          finally conn.disconnect()
+        }
+        .orElseSucceed(false)
+
+    def loop: UIO[Boolean] =
+      attempt.flatMap {
+        case true  => ZIO.succeed(true)
+        case false => ZIO.sleep(200.millis) *> loop
+      }
+
+    loop
+      .timeout(timeout)
+      .flatMap {
+        case Some(true) => ZIO.unit
+        case _          =>
+          val tail =
+            try Files.readString(logFile).takeRight(2000)
+            catch case _: Throwable => ""
+          ZIO.fail(
+            ChekhovError.Serve(s"Server not ready at $url within $timeout (alive=${process.isAlive}). Log:\n$tail")
+          )
+      }
+  end waitUntilReady
+end AppServer

@@ -1,0 +1,10 @@
+{
+  "name": "chekhov",
+  "private": true,
+  "scripts": {
+    "playwright:install": "./scripts/install-browsers.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

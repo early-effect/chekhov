@@ -1,0 +1,10 @@
+{
+  "name": "chekhov-vite-fixture",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
