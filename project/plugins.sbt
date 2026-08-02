@@ -6,4 +6,4 @@ addSbtPlugin("rocks.earlyeffect" % "sbt-specular"  % "0.7.2")
 addSbtPlugin("rocks.earlyeffect" % "sbt-zipx"      % "0.1.3")
 
 // Protocol YAML → Scala AST codegen (meta-build).
-libraryDependencies += "org.yaml" % "snakeyaml" % "2.4"
+libraryDependencies += "org.yaml" % "snakeyaml" % "2.6"
