@@ -2,6 +2,9 @@ import scala.collection.immutable.ListMap
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport.*
 import complete.DefaultParsers.*
 import chekhov.protocol.PlaywrightVendor
+// sbt has its own `Exec` (a queued command), so the two wildcards collide. An explicit named
+// import outranks both, and this is the one we mean: the shell AST's simple command.
+import zipx.shell.Exec
 
 val scala3Version  = "3.8.4"
 val zioVersion     = "2.1.26"
@@ -43,91 +46,159 @@ pomIncludeRepository := { _ => false }
 usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
 
 // Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
-val ciVerify =
+// Typed at its definition: SbtCommand's apply is inline and only accepts a literal.
+val ciVerify: SbtCommand = SbtCommand(
   "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
+)
 
-val chekhovBrowserSetup: StepContext => List[Step] = ctx =>
-  List(
-    Step(
-      name = Some("Cache Playwright apt packages"),
-      uses = Some(ctx.actions.cache),
-      `with` = ListMap(
-        // User-writable mirror of /var/cache/apt/archives (needs sudo to seed apt).
-        "path"         -> "~/.cache/chekhov-apt-archives",
-        "key"          -> "${{ runner.os }}-chekhov-apt-${{ hashFiles('package-lock.json') }}",
-        "restore-keys" -> "${{ runner.os }}-chekhov-apt-",
-      ),
-    ),
-    Step(
-      name = Some("Set up Node"),
-      uses = Some("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"), // v6.4.0
-      `with` = ListMap(
-        "node-version" -> "24",
-        "cache"        -> "npm",
-      ),
-    ),
-    Step(
-      name = Some("npm ci"),
-      run = Some("npm ci"),
-    ),
-    Step(
-      name = Some("npm ci (vite fixture)"),
-      run = Some("npm ci --prefix examples/vite-fixture"),
-    ),
-    Step(
-      name = Some("npm ci (ascent fixture)"),
-      run = Some("npm ci --prefix examples/ascent-fixture"),
-    ),
-    // Browsers under target/ms-playwright (zipxEnv) ride LocalDir; apt .debs are mirrored
-    // into ~/.cache/chekhov-apt-archives so install-deps can reuse them across runs.
-    Step(
-      name = Some("Install Playwright browsers"),
-      run = Some(
-        """|set -euo pipefail
-           |apt_mirror="${HOME}/.cache/chekhov-apt-archives"
-           |mkdir -p "${apt_mirror}"
-           |sudo mkdir -p /var/cache/apt/archives/partial
-           |if ls "${apt_mirror}"/*.deb >/dev/null 2>&1; then
-           |  echo "Seeding apt archives from ${apt_mirror} ($(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs)"
-           |  sudo cp -n "${apt_mirror}"/*.deb /var/cache/apt/archives/ || true
-           |fi
-           |mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
-           |chmod +x ./scripts/install-browsers.sh
-           |./scripts/install-browsers.sh chromium chromium-headless-shell firefox webkit
-           |if ls /var/cache/apt/archives/*.deb >/dev/null 2>&1; then
-           |  sudo cp -n /var/cache/apt/archives/*.deb "${apt_mirror}/" || true
-           |  sudo chown -R "$(id -u):$(id -g)" "${apt_mirror}"
-           |  echo "Apt mirror now has $(ls -1 "${apt_mirror}"/*.deb | wc -l | tr -d ' ') debs"
-           |fi
-           |echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
-           |""".stripMargin
-      ),
-    ),
+// The Playwright install, as a shell AST rather than a stripMargin block: quoting, globbing and
+// command substitution are the model's business, so an unquoted "${apt_mirror}"/*.deb or a stray
+// tab is a compile error. zipx's ConsumerStepsSpec asserts this renders byte-identically to the
+// text it replaces, which is why the regenerated ci.yml diff stays empty.
+val aptMirrorPath: Word = Word.dquote(Word.vBraced("HOME"), Word.lit("/.cache/chekhov-apt-archives"))
+val aptMirror: Word     = Word.dquote(Word.vBraced("apt_mirror"))
+val mirrorDebs: Word    = Word.cat(aptMirror, Word.lit("/*.deb"))
+val cacheDebs: Word     = Word.lit("/var/cache/apt/archives/*.deb")
+
+def debCount(glob: Word): Word.Subst =
+  Word.subst(
+    Exec("ls", Word.lit("-1"), glob) | Exec("wc", Word.lit("-l")) | Exec("tr", Word.lit("-d"), Word.squote(" "))
   )
 
-zipxJavaVersion      := "25"
+def anyFilesMatch(glob: Word): ShTest = ShTest.succeeds(Exec("ls", glob).silenced)
+
+// `|| true` so a copy that finds nothing to do does not trip `set -e`. Trailing `||` because
+// .sbt files parse under the scala213source3 dialect, which rejects a leading infix operator.
+def orTrue(command: zipx.shell.InlineCommand): zipx.shell.InlineCommand = command || Exec("true")
+
+val installBrowsers: Script =
+  Script
+    .strict(
+      Assign("apt_mirror", aptMirrorPath),
+      Exec("mkdir", Word.lit("-p"), aptMirror),
+      Exec("sudo", Word.lit("mkdir"), Word.lit("-p"), Word.lit("/var/cache/apt/archives/partial")),
+      If(
+        anyFilesMatch(mirrorDebs),
+        Block(
+          Exec(
+            "echo",
+            Word.dquote(
+              Word.lit("Seeding apt archives from "),
+              Word.vBraced("apt_mirror"),
+              Word.lit(" ("),
+              debCount(mirrorDebs),
+              Word.lit(" debs)"),
+            ),
+          ),
+          orTrue(Exec("sudo", Word.lit("cp"), Word.lit("-n"), mirrorDebs, Word.lit("/var/cache/apt/archives/"))),
+        ),
+      ),
+      Exec("mkdir", Word.lit("-p"), Word.dquote(Word.vBraced("PLAYWRIGHT_BROWSERS_PATH"))),
+      Exec("chmod", Word.lit("+x"), Word.lit("./scripts/install-browsers.sh")),
+      Exec.of(
+        "./scripts/install-browsers.sh",
+        List(Word.lit("chromium"), Word.lit("chromium-headless-shell"), Word.lit("firefox"), Word.lit("webkit")),
+      ),
+      If(
+        anyFilesMatch(cacheDebs),
+        Block(
+          orTrue(
+            Exec(
+              "sudo",
+              Word.lit("cp"),
+              Word.lit("-n"),
+              cacheDebs,
+              Word.dquote(Word.vBraced("apt_mirror"), Word.lit("/")),
+            )
+          ),
+          Exec(
+            "sudo",
+            Word.lit("chown"),
+            Word.lit("-R"),
+            Word.dquote(Word.subst(Exec("id", Word.lit("-u"))), Word.lit(":"), Word.subst(Exec("id", Word.lit("-g")))),
+            aptMirror,
+          ),
+          Exec("echo", Word.dquote(Word.lit("Apt mirror now has "), debCount(mirrorDebs), Word.lit(" debs"))),
+        ),
+      ),
+      Exec(
+        "echo",
+        Word.dquote(
+          Word.lit("Playwright "),
+          Word.subst(Exec("node", Word.lit("-p"), Word.dquote(Word.lit("require('playwright/package.json').version")))),
+          Word.lit(" browsers ready"),
+        ),
+      ),
+    )
+    .withTrailingNewline(true)
+
+/** Takes the pins rather than reading them off a StepContext, so Steps.built can collect any raw
+  * escape hatch a future step introduces (Steps.buildingWith runs too late to report one).
+  */
+def chekhovBrowserSetup(pins: ActionPins): Steps =
+  Steps.built("chekhov-browsers")(
+    // usesRef, not uses: an ActionPins field is already a validated ActionRef.
+    Step
+      .usesRef(pins.cache)
+      .named("Cache Playwright apt packages")
+      .withInputs(
+        ListMap(
+          // User-writable mirror of /var/cache/apt/archives (needs sudo to seed apt).
+          "path" -> "~/.cache/chekhov-apt-archives",
+          "key"  -> Expr
+            .concat(
+              Expr.runner("os"),
+              Expr.lit("-chekhov-apt-"),
+              Expr.call("hashFiles", Expr.quoted("package-lock.json")),
+            )
+            .render,
+          "restore-keys" -> Expr.concat(Expr.runner("os"), Expr.lit("-chekhov-apt-")).render,
+        )
+      ),
+    // Step.uses is inline, so an unpinned or malformed ref is a compile error naming it.
+    Step
+      .uses("actions/setup-node@820762786026740c76f36085b0efc47a31fe5020") // v7.0.0
+      .named("Set up Node")
+      .withInputs(ListMap("node-version" -> "24", "cache" -> "npm")),
+    Step.run(Script(Exec("npm", Word.lit("ci")))).named("npm ci"),
+    Step
+      .run(Script(Exec("npm", Word.lit("ci"), Word.lit("--prefix"), Word.lit("examples/vite-fixture"))))
+      .named("npm ci (vite fixture)"),
+    Step
+      .run(Script(Exec("npm", Word.lit("ci"), Word.lit("--prefix"), Word.lit("examples/ascent-fixture"))))
+      .named("npm ci (ascent fixture)"),
+    // Browsers under target/ms-playwright (zipxEnv) ride LocalDir; apt .debs are mirrored
+    // into ~/.cache/chekhov-apt-archives so install-deps can reuse them across runs.
+    Step.run(installBrowsers).named("Install Playwright browsers"),
+  )
+
+zipxJavaVersion      := JdkVersion("25")
 zipxWorkflowDispatch := true
 zipxScalaSteward     := true
-zipxTestTask         := ciVerify
+// SbtCommandText is a Subtype[String], so .text widens into String positions.
+zipxTestTask := ciVerify.text
 // LocalDir: after merge, skip full Verify but emit cache-rehydrate so main gets an
 // actions/cache save later PRs can restore. Browser setup on rehydrate (0.1.2+);
 // path on zipxEnv (0.1.3+ omits env from reusable-workflow callers like ZipxDocs).
 zipxCacheRehydrateOnMerge    := true
 zipxCacheRehydrateTask       := "compile"
-zipxCacheRehydrateExtraSteps := chekhovBrowserSetup
+zipxCacheRehydrateExtraSteps := chekhovBrowserSetup(zipxActions.value)
 zipxEnv := Map(
-  "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.expr("${{ github.workspace }}/target/ms-playwright"),
+  "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.typed(Expr.github("workspace") ++ Expr.lit("/target/ms-playwright")),
 )
 
+// Overriding the builtin `test` capability by name replaces its command too, and Capability.test's
+// is ModuleNode.DefaultTestTask (`test`), so the command has to be restated here or zipxTestTask
+// is silently lost.
 zipxCapabilities += Capability.test.copy(
   command = _ => ciVerify,
-  extraSteps = chekhovBrowserSetup,
+  extraSteps = chekhovBrowserSetup(zipxActions.value),
   env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
 
-addCommandAlias("ci", s"; $ciVerify")
+addCommandAlias("ci", s"; ${ciVerify.text}")
 addCommandAlias("release", "; publishSigned; sonaRelease")
 
 lazy val playwrightVersion    = settingKey[String]("Pinned Playwright npm + protocol.yml version")
