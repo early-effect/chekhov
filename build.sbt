@@ -431,7 +431,7 @@ lazy val jsenv = (project in file("jsenv"))
     name := "chekhov-jsenv",
     scalacOptions ++= commonScalacOptions,
     libraryDependencies ++= Seq(
-      ("org.scala-js" %% "scalajs-js-envs" % "1.6.0").cross(CrossVersion.for3Use2_13),
+      "org.scala-js" %% "scalajs-js-envs" % "1.6.0",
       "dev.zio"       %% "zio"             % zioVersion,
       "dev.zio"       %% "zio-json"        % zioJsonVersion,
     ),
