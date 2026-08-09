@@ -2,7 +2,7 @@ addSbtPlugin("org.scala-js"      % "sbt-scalajs"   % "1.22.0")
 addSbtPlugin("org.scalameta"     % "sbt-scalafmt"  % "2.6.2")
 addSbtPlugin("rocks.earlyeffect" % "sbt-dynver-ci" % "0.2.2")
 addSbtPlugin("com.github.sbt"    % "sbt-pgp"       % "2.3.1")
-addSbtPlugin("rocks.earlyeffect" % "sbt-specular"  % "0.11.0")
+addSbtPlugin("rocks.earlyeffect" % "sbt-specular"  % "0.12.0")
 addSbtPlugin("rocks.earlyeffect" % "sbt-zipx"      % "0.1.6")
 
 // Protocol YAML → Scala AST codegen (meta-build).
