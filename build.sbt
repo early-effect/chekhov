@@ -475,7 +475,7 @@ lazy val `sbt-chekhov` = (project in file("sbt-chekhov"))
     scalacOptions ++= commonScalacOptions,
   )
 
-val specularVersion = "0.11.0"
+val specularVersion = "0.12.0"
 
 lazy val docs = (project in file("docs"))
   .dependsOn(`zio-test`)
