@@ -191,7 +191,7 @@ zipxEnv := Map(
 // is ModuleNode.DefaultTestTask (`test`), so the command has to be restated here or zipxTestTask
 // is silently lost.
 zipxCapabilities += Capability.test.copy(
-  command = _ => ciVerify,
+  command = _ => Some(ciVerify),
   extraSteps = chekhovBrowserSetup(zipxActions.value),
   env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
 )
