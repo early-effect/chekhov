@@ -109,13 +109,16 @@ object PinnedPlaywright:
       browsers: List[ChekhovBrowser] = defaultInstallBrowsers,
       log: String => Unit = println,
   ): Either[String, Path] =
-    val node = lookup.env.getOrElse("PLAYWRIGHT_NODEJS_PATH", "node")
-    for
-      _   <- ensureCommand(node, "Node.js")
-      _   <- ensureCommand("npm", "npm")
-      cli <- ensurePinnedCli(lookup, log)
-      _   <- installBrowsers(lookup, node, cli, browsers, log)
-    yield cli
+    if browsers.isEmpty then
+      Left("chekhov: no browsers to install. Set chekhovBrowsers to at least one ChekhovBrowser.")
+    else
+      val node = lookup.env.getOrElse("PLAYWRIGHT_NODEJS_PATH", "node")
+      for
+        _   <- ensureCommand(node, "Node.js")
+        _   <- ensureCommand("npm", "npm")
+        cli <- ensurePinnedCli(lookup, log)
+        _   <- installBrowsers(lookup, node, cli, browsers, log)
+      yield cli
   end install
 
   def cacheRoot(lookup: Lookup = Lookup.system): Path =
@@ -128,6 +131,10 @@ object PinnedPlaywright:
 
   def cliInCache(lookup: Lookup = Lookup.system): Path =
     packageDir(lookup).resolve("node_modules").resolve("playwright").resolve("cli.js")
+
+  /** Playwright CLI package names for `install` / `install-deps`. No extra engines, no ffmpeg. */
+  def installPackageNames(browsers: List[ChekhovBrowser]): List[String] =
+    browsers.map(_.channelName)
 
   def browsersRoot(lookup: Lookup = Lookup.system): Path =
     lookup.env.get("PLAYWRIGHT_BROWSERS_PATH") match
@@ -299,7 +306,7 @@ object PinnedPlaywright:
       browsers: List[ChekhovBrowser],
       log: String => Unit,
   ): Either[String, Unit] =
-    val names   = browsers.map(_.channelName) :+ "ffmpeg"
+    val names   = installPackageNames(browsers)
     val env     = sanitizedBrowserEnv(lookup)
     val linuxCi =
       sys.props.getOrElse("os.name", "").toLowerCase.contains("linux") &&

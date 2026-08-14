@@ -99,9 +99,9 @@ sbt chekhovInstall          # needs sbt-chekhov; no package.json in the consumer
 sbt 'Test/testOnly …'
 ```
 
-`chekhovInstall` extracts `playwright@1.62.1` into the Chekhov cache and installs the
-matching Chromium / Firefox / WebKit revisions into Playwright's OS cache. Tests then
-find that pin without `PLAYWRIGHT_DRIVER_CLI`.
+`chekhovInstall` extracts `playwright@1.62.1` into the Chekhov cache and installs **only**
+the browsers in `chekhovBrowsers` (default: Chromium, from `chekhovBrowser`). Tests then
+find that pin without `PLAYWRIGHT_DRIVER_CLI`. `ChekhovSuite` runs once per listed browser.
 
 `PLAYWRIGHT_DRIVER_CLI` remains an override, but the CLI's `package.json` version must
 equal the pin. A mismatch fails **before** `run-driver` (a skew protocol looks like a
@@ -289,7 +289,15 @@ sbt dom/testFull
 
 ## Engines
 
-Chromium, Firefox, and WebKit are first-class. Use `ChekhovSuite.forBrowsers` or `-Dchekhov.browser=firefox`.
+Chromium, Firefox, and WebKit are first-class. Declare the list once in sbt; install and
+`ChekhovSuite` both honor it:
+
+```scala
+chekhovBrowsers := Seq(ChekhovBrowser.Firefox)
+// or: chekhovBrowsers := Seq(ChekhovBrowser.Chromium, ChekhovBrowser.Firefox)
+```
+
+Without the plugin: `ChekhovSuite.forBrowsers(...)` or `-Dchekhov.browsers=firefox,chromium`.
 
 ## Contributing
 

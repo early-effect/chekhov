@@ -52,7 +52,7 @@ sbt chekhovInstall
 ```
 
 That installs **Playwright ${ProtocolMeta.playwrightProtocolVersion}** (the protocol pin) and
-the matching Chromium / Firefox / WebKit revisions. `PLAYWRIGHT_DRIVER_CLI` is an override only;
+**only** the browsers in `chekhovBrowsers`. `PLAYWRIGHT_DRIVER_CLI` is an override only;
 a different version is a hard error that names the pin.
 
 Locally, browsers land in Playwright’s OS cache (`~/.cache/ms-playwright` on Linux,
@@ -66,17 +66,21 @@ so browsers ride the LocalDir sbt `actions/cache` key (same epoch / `run_id` res
 compile products).
 """
     ),
-    section("Pick an engine")(
+    section("Pick engines")(
       md"""
-Defaults come from `ChekhovConfig` (`-Dchekhov.browser` / `CHEKHOV_BROWSER`, headless flags,
-`artifactsDir` under `target/chekhov`):
+One sbt list is both **installed** and **executed**. `ChekhovSuite` runs the spec once per
+entry (a labeled copy each). `chekhovInstall` installs that list only: no extra engines,
+no ffmpeg.
 
 ```scala
-ChekhovConfig(browser = ChekhovBrowser.Firefox, headless = true)
+chekhovBrowsers := Seq(ChekhovBrowser.Firefox)
+// or several:
+chekhovBrowsers := Seq(ChekhovBrowser.Chromium, ChekhovBrowser.Firefox)
 ```
 
-`sbt-chekhov` mirrors that with `chekhovBrowser` / `chekhovHeadless` settings. Multi-engine
-suites can fan out with `ChekhovSuite.forBrowsers(ChekhovBrowser.Chromium, …)`.
+`chekhovBrowser := "firefox"` still works and sets a one-element list. `ChekhovJSEnv` uses
+the first entry. Without the plugin, `-Dchekhov.browsers=firefox,chromium` or
+`ChekhovSuite.forBrowsers(ChekhovBrowser.Firefox, …)` does the same fan-out.
 """,
       exampleValue {
         (
