@@ -42,7 +42,9 @@ This is a **multi-module toolkit**: pick the artifacts you need (`chekhov-core`,
           s"""libraryDependencies ++= Seq(
   "${m.organization}" %% "chekhov-zio-test" % "${m.version}" % Test,
   "${m.organization}" %% "chekhov-driver"   % "${m.version}" % Test,
-)""",
+)
+// project/plugins.sbt, then: sbt chekhovInstall
+addSbtPlugin("${m.organization}" % "sbt-chekhov" % "${m.version}")""",
         ),
         CodeSnippet(
           "Scala.js DOM + JSEnv",

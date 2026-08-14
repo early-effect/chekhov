@@ -4,7 +4,7 @@ import org.scalajs.dom
 import zio.*
 import zio.test.*
 
-/** Live DOM helpers under ChekhovJSEnv. Enable with `CHEKHOV_E2E=1` (or `-Dchekhov.e2e=1`). */
+/** Live DOM helpers under ChekhovJSEnv. */
 object ChekhovDomSpec extends ZIOSpecDefault:
 
   override def aspects =

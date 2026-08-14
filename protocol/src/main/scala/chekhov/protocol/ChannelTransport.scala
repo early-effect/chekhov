@@ -10,7 +10,6 @@ import zio.stream.*
 import java.io.{BufferedInputStream, BufferedOutputStream, InputStream, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
 import scala.jdk.CollectionConverters.*
 
 /** Framed JSON pipe to the Playwright Node driver (`run-driver`). */
@@ -157,35 +156,19 @@ object ChannelTransport:
 
   private def resolveDriver(using Trace): IO[ChekhovError, DriverPaths] =
     ZIO
-      .attemptBlocking {
-        val fromEnv    = sys.env.get("PLAYWRIGHT_DRIVER_CLI")
-        val candidates = List(
-          fromEnv,
-          sys.env.get("npm_config_prefix").map(_ + "/lib/node_modules/playwright/cli.js"),
-          Some("node_modules/playwright/cli.js"),
-          Some("node_modules/playwright/lib/cli/cli.js"),
-        ).flatten.map(Path.of(_))
-
-        val cli = candidates
-          .find(p => Files.isRegularFile(p))
-          .getOrElse(Path.of("playwright-cli-missing"))
-
-        val node = sys.env.getOrElse("PLAYWRIGHT_NODEJS_PATH", "node")
-        if !Files.isRegularFile(cli) && fromEnv.isEmpty then
-          val pb = new ProcessBuilder("node", "-p", "require.resolve('playwright/cli.js')")
-          pb.redirectErrorStream(true)
-          val p    = pb.start()
-          val out  = new String(p.getInputStream.readAllBytes(), StandardCharsets.UTF_8).trim
-          val code = p.waitFor()
-          if code == 0 && Files.isRegularFile(Path.of(out)) then DriverPaths(node, out)
-          else
-            throw new IllegalStateException(
-              "Playwright CLI not found. Install with `npm i -D playwright` or set PLAYWRIGHT_DRIVER_CLI."
-            )
-        else DriverPaths(node, cli.toAbsolutePath.toString)
-        end if
+      .attemptBlocking(PinnedPlaywright.resolve())
+      .mapError(e =>
+        ChekhovError.Driver(
+          s"chekhov: failed to resolve Playwright ${PinnedPlaywright.version} CLI: ${e.getMessage}",
+          Some(e),
+        )
+      )
+      .flatMap {
+        case Right(driver) =>
+          ZIO.succeed(DriverPaths(driver.node, driver.cli.toString))
+        case Left(problem) =>
+          ZIO.fail(ChekhovError.Driver(problem.message))
       }
-      .mapError(e => ChekhovError.Driver(e.getMessage, Some(e)))
 
   /** Length-prefixed JSON frames as a pull-based stream (cancelable via InputStream.close). */
   private def framedInbound(in: InputStream)(using Trace): ZStream[Any, ChekhovError, Json] =

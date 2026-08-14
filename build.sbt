@@ -193,7 +193,6 @@ zipxEnv := Map(
 zipxCapabilities += Capability.test.copy(
   command = _ => Some(ciVerify),
   extraSteps = chekhovBrowserSetup(zipxActions.value),
-  env = Map("CHEKHOV_E2E" -> EnvValue.plain("1")),
 )
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
@@ -377,16 +376,7 @@ lazy val dom = (project in file("dom"))
       "dev.zio"      %% "zio-test"     % zioVersion % Test,
       "dev.zio"      %% "zio-test-sbt" % zioVersion % Test,
     ),
-    Test / mainClass    := None,
-    Test / definedTests := Def.uncached {
-      val enabled =
-        sys.env.get("CHEKHOV_E2E").contains("1") ||
-          sys.props.get("chekhov.e2e").contains("1")
-      if enabled then (Test / definedTests).value
-      else
-        streams.value.log.info("chekhov-dom tests skipped (set CHEKHOV_E2E=1 or -Dchekhov.e2e=1)")
-        Seq.empty
-    },
+    Test / mainClass := None,
     // Monorepo only: load ChekhovJSEnv via classpath file (consumers use chekhovJSEnv / ChekhovJSEnv()).
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
@@ -407,16 +397,7 @@ lazy val ascent = (project in file("ascent"))
       "dev.zio"           %% "zio-test"     % zioVersion % Test,
       "dev.zio"           %% "zio-test-sbt" % zioVersion % Test,
     ),
-    Test / mainClass    := None,
-    Test / definedTests := Def.uncached {
-      val enabled =
-        sys.env.get("CHEKHOV_E2E").contains("1") ||
-          sys.props.get("chekhov.e2e").contains("1")
-      if enabled then (Test / definedTests).value
-      else
-        streams.value.log.info("chekhov-ascent tests skipped (set CHEKHOV_E2E=1 or -Dchekhov.e2e=1)")
-        Seq.empty
-    },
+    Test / mainClass := None,
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)

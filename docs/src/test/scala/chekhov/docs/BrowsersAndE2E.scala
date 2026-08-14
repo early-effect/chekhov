@@ -1,48 +1,69 @@
 package chekhov.docs
 
 import chekhov.*
+import chekhov.protocol.generated.ProtocolMeta
 import specular.*
 import specular.ziotest.DocSpecSuite
 import zio.test.*
 
-/** Local and CI browser install, E2E gates, engine selection. */
+/** Local and CI browser install, engine selection. */
 object BrowsersAndE2E extends DocSpecSuite:
 
   def doc = page("Browsers and E2E")(
     md"""
 Chekhov drives real Chromium, Firefox, and WebKit. Install matching browser binaries for the
-pinned Playwright npm version, then opt into live suites with an E2E gate.
+pinned Playwright npm version. A `ChekhovSuite` runs with ordinary `sbt test`.
 """,
-    section("Install browsers")(
+    section("Keep expensive tests in their own module")(
       md"""
-From the Chekhov repo (or any consumer that has `scripts/install-browsers.sh`):
+There is no skip flag. If `sbt test` on a library module must stay cheap (no Node, no
+browsers), do not put a `ChekhovSuite` there. Give the browser suites their own sbt
+project and leave the fast tests where they are:
 
-```bash
-./scripts/install-browsers.sh          # or: sbt pwInstall / npm run playwright:install
+```scala
+lazy val core = (project in file("core"))
+  // unit tests only
+
+lazy val e2e = (project in file("e2e"))
+  .dependsOn(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
+      "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
+    ),
+  )
 ```
 
-Locally, browsers land in Playwright’s OS cache (`~/.cache/ms-playwright` on Linux,
-`~/Library/Caches/ms-playwright` on macOS). The install script clears Cursor sandbox
-`PLAYWRIGHT_BROWSERS_PATH` overrides so install and run agree.
-
-**zipx CI** sets `PLAYWRIGHT_BROWSERS_PATH` to `target/ms-playwright` so browsers ride the
-LocalDir sbt `actions/cache` key (same epoch / `run_id` restore chain as compile products).
+`sbt core/test` never launches Playwright. `sbt e2e/test` (or `e2e/testFull`) does.
+CI that should exercise the UI depends on the e2e module; scripted / publish jobs
+depend only on `core`.
 """
     ),
-    section("The E2E gate")(
+    section("Install browsers")(
       md"""
-Many suites skip unless you ask for live browsers:
+In a consuming repo (no `package.json` required):
 
-```bash
-export CHEKHOV_E2E=1
-# or: sbt -Dchekhov.e2e=1 …
+```scala
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
 ```
 
-Without the gate, `sbt test` / `testFull` stay green on machines without browsers (unit and
-protocol coverage still run). With the gate, driver dogfood, JSEnv smoke, and `chekhov-dom`
-live suites execute.
+```bash
+sbt chekhovInstall
+```
 
-This repo’s Verify job already exports `CHEKHOV_E2E=1`.
+That installs **Playwright ${ProtocolMeta.playwrightProtocolVersion}** (the protocol pin) and
+the matching Chromium / Firefox / WebKit revisions. `PLAYWRIGHT_DRIVER_CLI` is an override only;
+a different version is a hard error that names the pin.
+
+Locally, browsers land in Playwright’s OS cache (`~/.cache/ms-playwright` on Linux,
+`~/Library/Caches/ms-playwright` on macOS). The pinned CLI is cached under the Chekhov cache
+(`~/Library/Caches/chekhov` on macOS, `~/.cache/chekhov` on Linux), not whatever `npx` last
+downloaded.
+
+**This Chekhov repo** still uses `./scripts/install-browsers.sh` (or `sbt pwInstall`) next to
+its own `package.json` pin. **zipx CI** sets `PLAYWRIGHT_BROWSERS_PATH` to `target/ms-playwright`
+so browsers ride the LocalDir sbt `actions/cache` key (same epoch / `run_id` restore chain as
+compile products).
 """
     ),
     section("Pick an engine")(

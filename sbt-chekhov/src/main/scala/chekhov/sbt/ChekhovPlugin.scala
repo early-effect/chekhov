@@ -2,6 +2,7 @@ package chekhov.sbt
 
 import chekhov.ChekhovBrowser
 import chekhov.jsenv.ChekhovJSEnv
+import chekhov.protocol.PinnedPlaywright
 import org.scalajs.jsenv.JSEnv
 import sbt.*
 import sbt.Keys.*
@@ -15,10 +16,13 @@ object ChekhovPlugin extends AutoPlugin:
     val chekhovBrowser      = settingKey[String]("Playwright browser: chromium | firefox | webkit")
     val chekhovHeadless     = settingKey[Boolean]("Run Playwright headless")
     val chekhovArtifactsDir = settingKey[File]("Directory for Chekhov screenshots/traces/serve logs")
-    val chekhovInstall      = taskKey[Unit]("Install Playwright browsers via scripts/install-browsers.sh")
+    val chekhovInstall      = taskKey[Unit](
+      s"Install the pinned Playwright ${PinnedPlaywright.version} CLI and matching browser binaries"
+    )
 
     /** Playwright-backed JSEnv. On Scala.js projects: `Test / jsEnv := chekhovJSEnv.value`. */
     val chekhovJSEnv = settingKey[JSEnv]("ChekhovJSEnv from chekhovBrowser / chekhovHeadless")
+  end autoImport
 
   import autoImport.*
 
@@ -38,13 +42,11 @@ object ChekhovPlugin extends AutoPlugin:
     ),
     Test / fork    := true,
     chekhovInstall := {
-      import scala.sys.process.*
-      val root   = (ThisBuild / baseDirectory).value
-      val script = root / "scripts" / "install-browsers.sh"
-      val code   =
-        if script.isFile then Seq("bash", script.getAbsolutePath).!
-        else Seq("npx", "--yes", "playwright", "install", "chromium", "firefox", "webkit").!
-      if code != 0 then sys.error("chekhovInstall failed")
+      val log = streams.value.log
+      PinnedPlaywright.install(log = msg => log.info(msg)) match
+        case Left(err)  => sys.error(err)
+        case Right(cli) =>
+          log.info(s"Pinned Playwright ${PinnedPlaywright.version} CLI: $cli")
     },
   )
 end ChekhovPlugin

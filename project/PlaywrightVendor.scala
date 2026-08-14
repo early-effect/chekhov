@@ -58,7 +58,7 @@ object PlaywrightVendor:
     writeProtocolMeta(v, paths.protocolYml, paths.protocolMeta)
     writeGeneratedFromYaml(paths.protocolYml, paths.protocolMeta.getParentFile)
     if installBrowsers then run(paths.base, "bash", "./scripts/install-browsers.sh")
-    println(s"[chekhov] Playwright $v vendored. Review protocol diffs, then run tests (CHEKHOV_E2E=1 for live driver).")
+    println(s"[chekhov] Playwright $v vendored. Review protocol diffs, then run tests.")
   end bump
 
   /** Download + merge protocol YAML for `version` into `dest`. */

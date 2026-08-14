@@ -77,8 +77,8 @@ Stack target: Scala **3.8.4**, ZIO **2.1.x**, sbt **2.x**, Scala.js **1.22**, Pl
 - `Page.evaluate` via Frame `evaluateExpression` (SerializedValue JSON string)
 - `ChekhovSuite` with `withLiveClock` + suite timeout
 - Static fixture serve (`StaticFileServer`) + `examples/static-fixture`
-- Green multi-engine E2E (`CHEKHOV_E2E=1` or `-Dchekhov.e2e=1`) on Chromium / Firefox / WebKit
-- Browser install via `./scripts/install-browsers.sh` + zipx Verify Node 24 / cache / `CHEKHOV_E2E=1`
+- Green multi-engine E2E on Chromium / Firefox / WebKit
+- Browser install via `./scripts/install-browsers.sh` + zipx Verify Node 24 / cache
 - Unit tests for config, envelope codecs, protocol coverage inventory
 - Playwright bump tooling (`pwBump` / `pwVendor` / `pwInstall`)
 
@@ -153,8 +153,8 @@ Still curated (not generated from YAML field lists):
 - Static serve MIME for `.js` / `.mjs` / `.css` / `.json`
 - Gated Com round-trip E2E on Chromium / Firefox / WebKit (`JsEnvComSpec`)
 - `examples/jsenv-smoke`: trivial Scala.js zio-test suite via `ChekhovJsEnvBridge` + `jsenv-smoke/test` in `ciVerify`
-- `chekhov-dom`: `withRoot`, `waitFor`, testid / role / CSS locators; fill/click without `js.Dynamic`; live suite under ChekhovJSEnv (`dom/test` in `ciVerify`, skipped unless `CHEKHOV_E2E=1`)
-- `sbt-chekhov`: browser/headless/artifacts props; `chekhovInstall` prefers `./scripts/install-browsers.sh`
+- `chekhov-dom`: `withRoot`, `waitFor`, testid / role / CSS locators; fill/click without `js.Dynamic`; live suite under ChekhovJSEnv (`dom/test` in `ciVerify`)
+- `sbt-chekhov`: browser/headless/artifacts props; `chekhovInstall` installs the pinned Playwright CLI + browsers
 
 ### Next
 

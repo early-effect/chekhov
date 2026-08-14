@@ -82,10 +82,10 @@ Use `chekhov-dom` alone when you do not need ascent.
     section("Smoke in this repo")(
       md"""
 ```bash
-CHEKHOV_E2E=1 sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
-CHEKHOV_E2E=1 sbt jsenv-smoke/testFull
-CHEKHOV_E2E=1 sbt dom/testFull
-CHEKHOV_E2E=1 sbt ascent/testFull
+sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
+sbt jsenv-smoke/testFull
+sbt dom/testFull
+sbt ascent/testFull
 ```
 """,
       exampleValue {
