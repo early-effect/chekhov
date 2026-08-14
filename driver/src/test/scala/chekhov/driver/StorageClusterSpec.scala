@@ -6,17 +6,8 @@ import zio.json.*
 import zio.json.ast.Json
 import zio.test.*
 
-/** Live storage / cookies / webStorage cluster. Enable with `CHEKHOV_E2E=1` or `-Dchekhov.e2e=1`. */
+/** Live storage / cookies / webStorage cluster. */
 object StorageClusterSpec extends ZIOSpecDefault:
-
-  private def e2eEnabled: Boolean =
-    sys.env.get("CHEKHOV_E2E").contains("1") ||
-      sys.props.get("chekhov.e2e").contains("1")
-
-  private val onlyIfE2E: TestAspectPoly =
-    new TestAspect.PerTest.AtLeastR[Any]:
-      def perTest[R, E](test: ZIO[R, TestFailure[E], TestSuccess])(using Trace) =
-        if e2eEnabled then test else ZIO.succeed(TestSuccess.Ignored())
 
   override def aspects =
     Chunk(
@@ -108,5 +99,5 @@ object StorageClusterSpec extends ZIOSpecDefault:
           PlaywrightDriver.suiteLayers,
         )
       },
-    ) @@ onlyIfE2E
+    )
 end StorageClusterSpec

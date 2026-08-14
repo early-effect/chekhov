@@ -53,7 +53,7 @@ withMounted(ui) { root =>
 | `dom` | `chekhov-dom` | Scala.js in-page helpers (`withRoot`, waits, testid/role/CSS) |
 | `ascent` | `chekhov-ascent` | `withMounted` bridge for ascent UI + `chekhov-dom` (JSEnv) |
 | `jsenv` | `chekhov-jsenv` | Playwright-backed `ChekhovJSEnv` (scripts in a real browser page) |
-| `sbt-chekhov` | `sbt-chekhov` | Artifact dir / browser props + `chekhovInstall` |
+| `sbt-chekhov` | `sbt-chekhov` | Artifact dir / browser props + pinned `chekhovInstall` |
 
 ## Install
 
@@ -88,6 +88,29 @@ Test / jsEnv := chekhovJSEnv.value
 // equivalent: Test / jsEnv := ChekhovJSEnv()
 ```
 
+### Playwright pin (consumers)
+
+Chekhov speaks **this release's** Playwright channel (currently **1.62.1**). A leftover
+`npx` CLI, Cursor MCP driver, or another project's `node_modules` on `NODE_PATH` is not
+a valid substitute.
+
+```bash
+sbt chekhovInstall          # needs sbt-chekhov; no package.json in the consumer
+sbt 'Test/testOnly …'
+```
+
+`chekhovInstall` extracts `playwright@1.62.1` into the Chekhov cache and installs the
+matching Chromium / Firefox / WebKit revisions into Playwright's OS cache. Tests then
+find that pin without `PLAYWRIGHT_DRIVER_CLI`.
+
+`PLAYWRIGHT_DRIVER_CLI` remains an override, but the CLI's `package.json` version must
+equal the pin. A mismatch fails **before** `run-driver` (a skew protocol looks like a
+Chekhov bug). Missing browser revisions name the pin and the command to run.
+
+There is no skip flag. If a module's `test` must stay cheap, put `ChekhovSuite`s in a
+separate sbt project (`e2e`) and leave unit tests in `core`. `sbt core/test` never
+launches browsers; `sbt e2e/test` does.
+
 ### Artifacts
 
 Default `artifactsDir` is `target/chekhov` (override with `-Dchekhov.artifactsDir` / `CHEKHOV_ARTIFACTS_DIR`):
@@ -107,23 +130,21 @@ ChekhovConfig(
 // For OnFailure, also: suite(...)(...) @@ ChekhovSuite.retainArtifactsOnFailure
 ```
 
-Local browsers / E2E:
+Local browsers / E2E **in this repo**:
 
 ```bash
 npm ci
 npm ci --prefix examples/vite-fixture
 npm ci --prefix examples/ascent-fixture
-./scripts/install-browsers.sh   # or: npm run playwright:install
-export CHEKHOV_E2E=1
+./scripts/install-browsers.sh   # or: npm run playwright:install / sbt pwInstall
 sbt testFull
 ```
 
 Browsers land in Playwright’s default OS cache (`~/.cache/ms-playwright` on Linux,
-`~/Library/Caches/ms-playwright` on macOS). Prefer `./scripts/install-browsers.sh`
-(or `npm run playwright:install` / `sbt pwInstall`), which uses official
-`npx playwright install` on current Playwright. zipx CI installs under
-`target/ms-playwright` so browsers share the LocalDir sbt cache key, and sets
-`CHEKHOV_E2E=1`.
+`~/Library/Caches/ms-playwright` on macOS). Consuming projects should run
+`sbt chekhovInstall` instead of copying this script or adding `playwright` to a
+`package.json`. zipx CI installs under `target/ms-playwright` so browsers share
+the LocalDir sbt cache key.
 
 ## Bumping Playwright
 
@@ -153,7 +174,7 @@ the wire shape changes. After a bump:
 1. Skim the `protocol.yml` / `Commands.scala` diff for claimed-surface changes
 2. Extend the allowlist + `PlaywrightDriver` if the dogfood path needs a new method, then `sbt pwCodegen`
 3. `sbt pwInstall` if you need matching browser binaries locally
-4. `CHEKHOV_E2E=1 sbt 'protocol/testOnly chekhov.protocol.DriverSmokeSpec' 'driver/testOnly chekhov.driver.MultiBrowserFixtureSpec'`
+4. `sbt 'protocol/testOnly chekhov.protocol.DriverSmokeSpec' 'driver/testOnly chekhov.driver.MultiBrowserFixtureSpec'`
 
 **CI / zipx:** Verify runs `npm ci`, then `./scripts/install-browsers.sh` with
 `PLAYWRIGHT_BROWSERS_PATH` (build-wide `zipxEnv`, omitted from reusable-workflow
@@ -261,9 +282,9 @@ bridge so the monorepo need not publish to exercise CI.
 Live smoke (from this repo, with browsers installed):
 
 ```bash
-CHEKHOV_E2E=1 sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
-CHEKHOV_E2E=1 sbt jsenv-smoke/testFull
-CHEKHOV_E2E=1 sbt dom/testFull
+sbt 'jsenv/testOnly chekhov.jsenv.JsEnvComSpec'
+sbt jsenv-smoke/testFull
+sbt dom/testFull
 ```
 
 ## Engines

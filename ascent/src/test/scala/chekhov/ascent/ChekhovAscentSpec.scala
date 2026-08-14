@@ -10,7 +10,7 @@ import org.scalajs.dom
 import zio.*
 import zio.test.*
 
-/** Live `withMounted` dogfood under ChekhovJSEnv. Enable with `CHEKHOV_E2E=1` (or `-Dchekhov.e2e=1`). */
+/** Live `withMounted` dogfood under ChekhovJSEnv. */
 object ChekhovAscentSpec extends ZIOSpecDefault:
 
   override def aspects =

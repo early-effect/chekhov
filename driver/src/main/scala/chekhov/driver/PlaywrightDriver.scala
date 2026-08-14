@@ -1,7 +1,7 @@
 package chekhov.driver
 
 import chekhov.*
-import chekhov.protocol.{ChannelConnection, ChannelTransport}
+import chekhov.protocol.{ChannelConnection, ChannelTransport, PinnedPlaywright}
 import chekhov.protocol.generated.Commands
 import zio.*
 import zio.json.*
@@ -20,6 +20,9 @@ object PlaywrightDriver:
     def launch(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, Browser] =
       for
         config <- ZIO.service[ChekhovConfig]
+        _      <- ZIO
+          .fromEither(PinnedPlaywright.requireBrowser(config.browser))
+          .mapError(p => ChekhovError.Driver(p.message))
         // GitHub Actions / containers: Chromium needs the sandbox disabled.
         ci = sys.env.get("CI").contains("true") || sys.env.get("GITHUB_ACTIONS").contains("true")
         result <- conn.send(

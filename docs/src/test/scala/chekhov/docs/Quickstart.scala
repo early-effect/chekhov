@@ -1,7 +1,7 @@
 package chekhov.docs
 
 import chekhov.*
-import chekhov.protocol.generated.ProtocolSurface
+import chekhov.protocol.generated.{ProtocolMeta, ProtocolSurface}
 import specular.*
 import specular.ziotest.DocSpecSuite
 import zio.test.*
@@ -18,8 +18,23 @@ If the UI shows a control, a test should be able to fire it.
 """,
     section("A suite in one screenful")(
       md"""
-Add the suite stack (`chekhov-zio-test` + `chekhov-driver`), install browsers, set `CHEKHOV_E2E=1`,
-then:
+Add the suite stack, install this Chekhov version's Playwright, then run the tests:
+
+```scala
+// build.sbt
+libraryDependencies ++= Seq(
+  "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
+  "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
+)
+
+// project/plugins.sbt (optional, for chekhovInstall + JSEnv)
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+```
+
+```bash
+sbt chekhovInstall
+sbt 'Test/testOnly …'
+```
 
 ```scala
 import chekhov.*
@@ -39,6 +54,13 @@ object TodoSpec extends ChekhovSuite:
     }
   )
 ```
+
+No consumer `package.json`. A `ChekhovSuite` in a module just runs when you test that
+module. Keep browser suites in their own sbt project if `core/test` must stay cheap
+(see **Browsers and E2E**). `chekhovInstall` extracts Playwright
+`${ProtocolMeta.playwrightProtocolVersion}` into the Chekhov cache and installs matching
+Chromium / Firefox / WebKit. A leftover `npx` CLI or a different Playwright on
+`NODE_PATH` is a hard error, not a silent driver.
 
 `ChekhovSuite` wires config + driver + a fresh page per test. Override `chekhovConfig` when you
 need a different browser, `baseUrl`, or `artifactsDir`. Point `baseUrl` at a running app (or use

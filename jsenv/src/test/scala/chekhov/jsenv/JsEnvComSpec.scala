@@ -11,17 +11,8 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
-/** Live ChekhovJSEnv Com smoke. Enable with `CHEKHOV_E2E=1` or `-Dchekhov.e2e=1`. */
+/** Live ChekhovJSEnv Com smoke. */
 object JsEnvComSpec extends ZIOSpecDefault:
-
-  private def e2eEnabled: Boolean =
-    sys.env.get("CHEKHOV_E2E").contains("1") ||
-      sys.props.get("chekhov.e2e").contains("1")
-
-  private val onlyIfE2E: TestAspectPoly =
-    new TestAspect.PerTest.AtLeastR[Any]:
-      def perTest[R, E](test: ZIO[R, TestFailure[E], TestSuccess])(using Trace) =
-        if e2eEnabled then test else ZIO.succeed(TestSuccess.Ignored())
 
   override def aspects =
     Chunk(
@@ -67,5 +58,5 @@ object JsEnvComSpec extends ZIOSpecDefault:
       comRoundTrip(ChekhovBrowser.Chromium),
       comRoundTrip(ChekhovBrowser.Firefox),
       comRoundTrip(ChekhovBrowser.WebKit),
-    ) @@ onlyIfE2E
+    )
 end JsEnvComSpec
