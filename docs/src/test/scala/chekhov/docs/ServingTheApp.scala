@@ -28,8 +28,8 @@ object ViteSpec extends ChekhovSuite:
   override def chekhovConfig =
     ChekhovConfig(baseUrl = Some("http://127.0.0.1:5173"))
 
-  override def chekhovLayer =
-    ZLayer.succeed(chekhovConfig) >>>
+  override def chekhovLayerFor(cfg: ChekhovConfig) =
+    ZLayer.succeed(cfg) >>>
       (AppServer.viteLayer(Path.of("examples/vite-fixture")) ++ ChekhovSuite.fullStack)
 
   def spec = suite("vite")(

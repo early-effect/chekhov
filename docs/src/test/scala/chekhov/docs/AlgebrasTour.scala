@@ -42,7 +42,8 @@ need a channel method that is not claimed yet.
 | `AppServer.viteLayer` / `StaticFileServer.layer` | scoped serve |
 | `ChekhovSuite.fullStack` | config service ++ driver suite layers |
 
-Override `chekhovLayer` on the suite when you need serve + stack together.
+Override `chekhovLayerFor` on the suite when you need serve + stack together
+(it is applied once per `chekhovBrowsers` entry).
 """
     ),
     section("Screenshots on failure")(

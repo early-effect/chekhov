@@ -181,6 +181,9 @@ object PinnedPlaywrightSpec extends ZIOSpecDefault:
               ChekhovBrowser.Firefox,
               ChekhovBrowser.WebKit,
             ),
+            PinnedPlaywright.installPackageNames(List(ChekhovBrowser.Firefox)) == List("firefox"),
+            !PinnedPlaywright.installPackageNames(List(ChekhovBrowser.Firefox)).contains("ffmpeg"),
+            PinnedPlaywright.install(browsers = Nil, log = _ => ()).isLeft,
           )
         }
       },

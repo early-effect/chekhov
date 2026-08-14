@@ -21,6 +21,39 @@ object ChekhovBrowser:
       case "webkit"              => Some(WebKit)
       case _                     => None
 
+  /** Comma / whitespace separated channel names; unknown tokens are dropped. */
+  def fromList(s: String): List[ChekhovBrowser] =
+    s.split("[,\\s]+").iterator.map(_.trim).filter(_.nonEmpty).flatMap(fromString).toList.distinct
+
+  /** Browsers declared by `-Dchekhov.browsers` / `CHEKHOV_BROWSERS` (sbt `chekhovBrowsers`). */
+  def listed(
+      props: Map[String, String] = sys.props.toMap,
+      env: Map[String, String] = sys.env,
+  ): List[ChekhovBrowser] =
+    props
+      .get("chekhov.browsers")
+      .orElse(env.get("CHEKHOV_BROWSERS"))
+      .map(fromList)
+      .filter(_.nonEmpty)
+      .getOrElse(Nil)
+
+  /** Listed browsers, else the single `-Dchekhov.browser` / `CHEKHOV_BROWSER`, else Chromium. */
+  def configured(
+      props: Map[String, String] = sys.props.toMap,
+      env: Map[String, String] = sys.env,
+  ): List[ChekhovBrowser] =
+    listed(props, env) match
+      case Nil =>
+        props
+          .get("chekhov.browser")
+          .orElse(env.get("CHEKHOV_BROWSER"))
+          .flatMap(fromString)
+          .toList match
+          case Nil => List(Chromium)
+          case one => one
+      case many => many
+end ChekhovBrowser
+
 /** When to keep Playwright traces / videos under [[ChekhovConfig.artifactsDir]]. */
 enum ArtifactCapture:
   case Off, OnFailure, Always
@@ -54,11 +87,7 @@ object ChekhovConfig:
   val layer: ULayer[ChekhovConfig] =
     ZLayer.succeed:
       ChekhovConfig(
-        browser = sys.props
-          .get("chekhov.browser")
-          .orElse(sys.env.get("CHEKHOV_BROWSER"))
-          .flatMap(ChekhovBrowser.fromString)
-          .getOrElse(ChekhovBrowser.Chromium),
+        browser = ChekhovBrowser.configured().head,
         headless = sys.props
           .get("chekhov.headless")
           .orElse(sys.env.get("CHEKHOV_HEADLESS"))

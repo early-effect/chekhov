@@ -13,40 +13,52 @@ object ChekhovPlugin extends AutoPlugin:
   override def trigger  = allRequirements
 
   object autoImport:
-    val chekhovBrowser      = settingKey[String]("Playwright browser: chromium | firefox | webkit")
+    val chekhovBrowser  = settingKey[String]("Single Playwright browser: chromium | firefox | webkit")
+    val chekhovBrowsers = settingKey[Seq[ChekhovBrowser]](
+      "Browsers to install and run ChekhovSuite against (one suite copy each)"
+    )
     val chekhovHeadless     = settingKey[Boolean]("Run Playwright headless")
     val chekhovArtifactsDir = settingKey[File]("Directory for Chekhov screenshots/traces/serve logs")
     val chekhovInstall      = taskKey[Unit](
-      s"Install the pinned Playwright ${PinnedPlaywright.version} CLI and matching browser binaries"
+      s"Install the pinned Playwright ${PinnedPlaywright.version} CLI and chekhovBrowsers binaries"
     )
 
     /** Playwright-backed JSEnv. On Scala.js projects: `Test / jsEnv := chekhovJSEnv.value`. */
-    val chekhovJSEnv = settingKey[JSEnv]("ChekhovJSEnv from chekhovBrowser / chekhovHeadless")
+    val chekhovJSEnv = settingKey[JSEnv]("ChekhovJSEnv from chekhovBrowsers.head / chekhovHeadless")
   end autoImport
 
   import autoImport.*
 
   override def projectSettings: Seq[Setting[?]] = Seq(
     chekhovBrowser      := "chromium",
+    chekhovBrowsers     := ChekhovBrowser.fromString(chekhovBrowser.value).toSeq,
     chekhovHeadless     := true,
     chekhovArtifactsDir := (Test / target).value / "chekhov",
     chekhovJSEnv        := {
-      val browser =
-        ChekhovBrowser.fromString(chekhovBrowser.value).getOrElse(ChekhovBrowser.Chromium)
+      val browser = chekhovBrowsers.value.headOption.getOrElse(ChekhovBrowser.Chromium)
       ChekhovJSEnv(browser = browser, headless = chekhovHeadless.value)
     },
-    Test / javaOptions ++= Seq(
-      s"-Dchekhov.browser=${chekhovBrowser.value}",
-      s"-Dchekhov.headless=${chekhovHeadless.value}",
-      s"-Dchekhov.artifactsDir=${chekhovArtifactsDir.value.getAbsolutePath}",
-    ),
+    Test / javaOptions ++= Def.uncached {
+      val browsers = chekhovBrowsers.value
+      val primary  = browsers.headOption.getOrElse(ChekhovBrowser.Chromium)
+      Seq(
+        s"-Dchekhov.browser=${primary.channelName}",
+        s"-Dchekhov.browsers=${browsers.map(_.channelName).mkString(",")}",
+        s"-Dchekhov.headless=${chekhovHeadless.value}",
+        s"-Dchekhov.artifactsDir=${chekhovArtifactsDir.value.getAbsolutePath}",
+      )
+    },
     Test / fork    := true,
-    chekhovInstall := {
-      val log = streams.value.log
-      PinnedPlaywright.install(log = msg => log.info(msg)) match
+    chekhovInstall := Def.uncached {
+      val log      = streams.value.log
+      val browsers = chekhovBrowsers.value.toList
+      if browsers.isEmpty then sys.error("chekhovBrowsers is empty")
+      PinnedPlaywright.install(browsers = browsers, log = msg => log.info(msg)) match
         case Left(err)  => sys.error(err)
         case Right(cli) =>
-          log.info(s"Pinned Playwright ${PinnedPlaywright.version} CLI: $cli")
+          log.info(
+            s"Pinned Playwright ${PinnedPlaywright.version} CLI: $cli (${browsers.map(_.channelName).mkString(", ")})"
+          )
     },
   )
 end ChekhovPlugin
