@@ -132,8 +132,8 @@ val installBrowsers: Script =
     )
     .withTrailingNewline(true)
 
-/** Takes the pins rather than reading them off a StepContext, so Steps.built can collect any raw
-  * escape hatch a future step introduces (Steps.buildingWith runs too late to report one).
+/** Takes the pins rather than reading them off a StepContext, so Steps.built can collect any raw escape hatch a future
+  * step introduces (Steps.buildingWith runs too late to report one).
   */
 def chekhovBrowserSetup(pins: ActionPins): Steps =
   Steps.built("chekhov-browsers")(
@@ -183,8 +183,8 @@ zipxTestTask := ciVerify.text
 zipxCacheRehydrateOnMerge    := true
 zipxCacheRehydrateTask       := "compile"
 zipxCacheRehydrateExtraSteps := chekhovBrowserSetup(zipxActions.value)
-zipxEnv := Map(
-  "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.typed(Expr.github("workspace") ++ Expr.lit("/target/ms-playwright")),
+zipxEnv                      := Map(
+  "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.typed(Expr.github("workspace") ++ Expr.lit("/target/ms-playwright"))
 )
 
 // Overriding the builtin `test` capability by name replaces its command too, and Capability.test's
@@ -392,13 +392,13 @@ lazy val ascent = (project in file("ascent"))
     scalacOptions ++= commonScalacOptions,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     libraryDependencies ++= Seq(
-      "rocks.earlyeffect" %% "ascent-js"     % ascentVersion,
+      "rocks.earlyeffect" %% "ascent-js"    % ascentVersion,
       "dev.zio"           %% "zio"          % zioVersion,
       "dev.zio"           %% "zio-test"     % zioVersion % Test,
       "dev.zio"           %% "zio-test-sbt" % zioVersion % Test,
     ),
     Test / mainClass := None,
-    Test / jsEnv := Def.uncached {
+    Test / jsEnv     := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
     },
@@ -413,8 +413,8 @@ lazy val jsenv = (project in file("jsenv"))
     scalacOptions ++= commonScalacOptions,
     libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-js-envs" % "1.6.0",
-      "dev.zio"       %% "zio"             % zioVersion,
-      "dev.zio"       %% "zio-json"        % zioJsonVersion,
+      "dev.zio"      %% "zio"             % zioVersion,
+      "dev.zio"      %% "zio-json"        % zioJsonVersion,
     ),
     zioTestSettings,
     writeJsenvClasspath := Def.uncached {
@@ -456,7 +456,7 @@ lazy val `sbt-chekhov` = (project in file("sbt-chekhov"))
     scalacOptions ++= commonScalacOptions,
   )
 
-val specularVersion = "0.12.0"
+val specularVersion = "0.12.1"
 
 lazy val docs = (project in file("docs"))
   .dependsOn(`zio-test`)
