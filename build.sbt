@@ -6,11 +6,8 @@ import chekhov.protocol.PlaywrightVendor
 // import outranks both, and this is the one we mean: the shell AST's simple command.
 import zipx.shell.Exec
 
-val scala3Version  = "3.8.4"
-val zioVersion     = "2.1.26"
-val zioJsonVersion = "0.10.0"
+MyVersions.settings
 
-scalaVersion         := scala3Version
 organization         := "rocks.earlyeffect"
 organizationName     := "Early Effect"
 organizationHomepage := Some(uri("https://www.earlyeffect.rocks"))
@@ -44,12 +41,6 @@ publishMavenStyle    := true
 pomIncludeRepository := { _ => false }
 
 usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
-
-// Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
-// Typed at its definition: SbtCommand's apply is inline and only accepts a literal.
-val ciVerify: SbtCommand = SbtCommand(
-  "scalafmtCheckAll; zipxWorkflowCheck; core/testFull; protocol/testFull; driver/testFull; jsenv/testFull; zio-test/testFull; docs/testFull; jsenv-smoke/testFull; dom/testFull"
-)
 
 // The Playwright install, as a shell AST rather than a stripMargin block: quoting, globbing and
 // command substitution are the model's business, so an unquoted "${apt_mirror}"/*.deb or a stray
@@ -155,9 +146,8 @@ def chekhovBrowserSetup(pins: ActionPins): Steps =
           "restore-keys" -> Expr.concat(Expr.runner("os"), Expr.lit("-chekhov-apt-")).render,
         )
       ),
-    // Step.uses is inline, so an unpinned or malformed ref is a compile error naming it.
     Step
-      .uses("actions/setup-node@820762786026740c76f36085b0efc47a31fe5020") // v7.0.0
+      .usesRef(pins.setupNode)
       .named("Set up Node")
       .withInputs(ListMap("node-version" -> "24", "cache" -> "npm")),
     Step.run(Script(Exec("npm", Word.lit("ci")))).named("npm ci"),
@@ -174,30 +164,18 @@ def chekhovBrowserSetup(pins: ActionPins): Steps =
 
 zipxJavaVersion      := JdkVersion("25")
 zipxWorkflowDispatch := true
-zipxScalaSteward     := true
-// SbtCommandText is a Subtype[String], so .text widens into String positions.
-zipxTestTask := ciVerify.text
 // LocalDir: after merge, skip full Verify but emit cache-rehydrate so main gets an
 // actions/cache save later PRs can restore. Browser setup on rehydrate (0.1.2+);
 // path on zipxEnv (0.1.3+ omits env from reusable-workflow callers like ZipxDocs).
 zipxCacheRehydrateOnMerge    := true
-zipxCacheRehydrateTask       := "compile"
 zipxCacheRehydrateExtraSteps := chekhovBrowserSetup(zipxActions.value)
 zipxEnv := Map(
   "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.typed(Expr.github("workspace") ++ Expr.lit("/target/ms-playwright")),
 )
 
-// Overriding the builtin `test` capability by name replaces its command too, and Capability.test's
-// is ModuleNode.DefaultTestTask (`test`), so the command has to be restated here or zipxTestTask
-// is silently lost.
-zipxCapabilities += Capability.test.copy(
-  command = _ => Some(ciVerify),
-  extraSteps = chekhovBrowserSetup(zipxActions.value),
-)
 zipxCapabilities += ZipxCentral.release
 zipxCapabilities += ZipxDocs.pages()
 
-addCommandAlias("ci", s"; ${ciVerify.text}")
 addCommandAlias("release", "; publishSigned; sonaRelease")
 
 lazy val playwrightVersion    = settingKey[String]("Pinned Playwright npm + protocol.yml version")
@@ -224,10 +202,7 @@ val commonScalacOptions = Seq(
 )
 
 val zioTestSettings = Def.settings(
-  libraryDependencies ++= Seq(
-    "dev.zio" %% "zio-test"     % zioVersion % Test,
-    "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
-  ),
+  MyVersions.zioTests,
   Test / mainClass := None,
   // Playwright channel + Vite fixtures share Node / ports; parallel suites race on CI.
   Test / parallelExecution := false,
@@ -292,10 +267,7 @@ lazy val core = (project in file("core"))
   .settings(
     name := "chekhov-core",
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"         % zioVersion,
-      "dev.zio" %% "zio-streams" % zioVersion,
-    ),
+    MyVersions.zioCore,
     zioTestSettings,
   )
 
@@ -304,15 +276,10 @@ lazy val protocol = (project in file("protocol"))
   .settings(
     name := "chekhov-protocol",
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"         % zioVersion,
-      "dev.zio" %% "zio-streams" % zioVersion,
-      "dev.zio" %% "zio-json"    % zioJsonVersion,
-    ),
+    MyVersions.zioProtocol,
     zioTestSettings,
   )
 
-val ascentVersion         = "0.3.1"
 lazy val `ascent-fixture` = (project in file("examples/ascent-fixture"))
   .enablePlugins(ScalaJSPlugin)
   .settings(
@@ -321,10 +288,7 @@ lazy val `ascent-fixture` = (project in file("examples/ascent-fixture"))
     scalacOptions ++= commonScalacOptions,
     scalaJSUseMainModuleInitializer := true,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    libraryDependencies ++= Seq(
-      "rocks.earlyeffect" %% "ascent-js" % ascentVersion,
-      "dev.zio"           %% "zio"       % zioVersion,
-    ),
+    MyVersions.ascentLib,
   )
 
 lazy val writeAscentFixtureOut = taskKey[File]("Write ascent-fixture fastLinkJSOutput path for Vite")
@@ -340,11 +304,7 @@ lazy val driver = (project in file("driver"))
   .settings(
     name := "chekhov-driver",
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"         % zioVersion,
-      "dev.zio" %% "zio-streams" % zioVersion,
-      "dev.zio" %% "zio-json"    % zioJsonVersion,
-    ),
+    MyVersions.zioProtocol,
     zioTestSettings,
     Test / loadedTestFrameworks := Def.uncached {
       writeAscentFixtureOut.value
@@ -357,11 +317,7 @@ lazy val `zio-test` = (project in file("zio-test"))
   .settings(
     name := "chekhov-zio-test",
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"          % zioVersion,
-      "dev.zio" %% "zio-test"     % zioVersion,
-      "dev.zio" %% "zio-test-sbt" % zioVersion,
-    ),
+    MyVersions.zioTestLib,
   )
 
 lazy val dom = (project in file("dom"))
@@ -370,13 +326,8 @@ lazy val dom = (project in file("dom"))
     name := "chekhov-dom",
     scalacOptions ++= commonScalacOptions,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    libraryDependencies ++= Seq(
-      "dev.zio"      %% "zio"          % zioVersion,
-      "org.scala-js" %% "scalajs-dom"  % "2.8.0",
-      "dev.zio"      %% "zio-test"     % zioVersion % Test,
-      "dev.zio"      %% "zio-test-sbt" % zioVersion % Test,
-    ),
-    Test / mainClass := None,
+    MyVersions.domLib,
+    zioTestSettings,
     // Monorepo only: load ChekhovJSEnv via classpath file (consumers use chekhovJSEnv / ChekhovJSEnv()).
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
@@ -391,13 +342,8 @@ lazy val ascent = (project in file("ascent"))
     name := "chekhov-ascent",
     scalacOptions ++= commonScalacOptions,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    libraryDependencies ++= Seq(
-      "rocks.earlyeffect" %% "ascent-js"     % ascentVersion,
-      "dev.zio"           %% "zio"          % zioVersion,
-      "dev.zio"           %% "zio-test"     % zioVersion % Test,
-      "dev.zio"           %% "zio-test-sbt" % zioVersion % Test,
-    ),
-    Test / mainClass := None,
+    MyVersions.ascentLib,
+    zioTestSettings,
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
       new chekhov.build.ChekhovJsEnvBridge(f)
@@ -411,11 +357,7 @@ lazy val jsenv = (project in file("jsenv"))
   .settings(
     name := "chekhov-jsenv",
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "org.scala-js" %% "scalajs-js-envs" % "1.6.0",
-      "dev.zio"       %% "zio"             % zioVersion,
-      "dev.zio"       %% "zio-json"        % zioJsonVersion,
-    ),
+    MyVersions.jsenvLib,
     zioTestSettings,
     writeJsenvClasspath := Def.uncached {
       given FileConverter = fileConverter.value
@@ -435,12 +377,8 @@ lazy val `jsenv-smoke` = (project in file("examples/jsenv-smoke"))
     publish / skip := true,
     scalacOptions ++= commonScalacOptions,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"          % zioVersion,
-      "dev.zio" %% "zio-test"     % zioVersion % Test,
-      "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
-    ),
-    Test / mainClass := None,
+    MyVersions.zioOnly,
+    zioTestSettings,
     // Monorepo only: see ChekhovJsEnvBridge. Consumers: Test / jsEnv := ChekhovJSEnv().
     Test / jsEnv := Def.uncached {
       val f = (jsenv / writeJsenvClasspath).value
@@ -456,8 +394,6 @@ lazy val `sbt-chekhov` = (project in file("sbt-chekhov"))
     scalacOptions ++= commonScalacOptions,
   )
 
-val specularVersion = "0.12.0"
-
 lazy val docs = (project in file("docs"))
   .dependsOn(`zio-test`)
   .enablePlugins(SpecularPlugin)
@@ -465,14 +401,9 @@ lazy val docs = (project in file("docs"))
     name           := "chekhov-docs",
     publish / skip := true,
     scalacOptions ++= commonScalacOptions,
-    libraryDependencies ++= Seq(
-      "rocks.earlyeffect" %% "specular-core"           % specularVersion % Test,
-      "rocks.earlyeffect" %% "specular-zio-test"       % specularVersion % Test,
-      "rocks.earlyeffect" %% "specular-site"           % specularVersion % Test,
-      "rocks.earlyeffect" %% "early-effect-docs-theme" % specularVersion % Test,
-    ),
+    MyVersions.docsTest,
     // specular-site still declares zio-json 0.9.x
-    dependencyOverrides += "dev.zio" %% "zio-json" % zioJsonVersion,
+    dependencyOverrides += MyVersions.moduleID(MyVersions.zioJson),
     zioTestSettings,
     specularBuildMain     := "chekhov.docs.BuildSite",
     specularMetaProject   := Some(LocalProject("core")),
@@ -489,3 +420,27 @@ lazy val docs = (project in file("docs"))
       }
     },
   )
+
+// Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
+// Builtin fmt / workflow-check / advisories stay parallel; do not make test wait on fmt.
+// Overriding the builtin `test` capability by name replaces its command too, so restate it here.
+lazy val ciVerify: SbtCommand = zipxTasks.session(
+  core / testFull,
+  protocol / testFull,
+  driver / testFull,
+  jsenv / testFull,
+  `zio-test` / testFull,
+  docs / testFull,
+  `jsenv-smoke` / testFull,
+  dom / testFull,
+)
+
+zipxTestTask := ciVerify
+zipxCapabilities += Capability.once(
+  name = Capability.TestName,
+  command = ciVerify,
+  extraSteps = chekhovBrowserSetup(zipxActions.value),
+)
+
+addCommandAlias("ci", s"; ${ciVerify.text}")
+
