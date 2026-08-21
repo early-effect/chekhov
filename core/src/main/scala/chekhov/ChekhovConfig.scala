@@ -81,6 +81,13 @@ final case class ChekhovConfig(
     browserInstallEnv: Map[String, String] = Map.empty,
     traceCapture: ArtifactCapture = ArtifactCapture.Off,
     videoCapture: ArtifactCapture = ArtifactCapture.Off,
+    // Launch a system browser instead of a Playwright-downloaded one: `executablePath`
+    // points at a browser binary, `channel` selects an installed channel (e.g. "chrome").
+    // When either is set the pinned-browser-revision check is skipped. `launchArgs` are
+    // extra process args (e.g. "--no-sandbox" in sandboxed / NixOS environments).
+    executablePath: Option[String] = None,
+    channel: Option[String] = None,
+    launchArgs: List[String] = Nil,
 )
 
 object ChekhovConfig:
@@ -108,6 +115,19 @@ object ChekhovConfig:
           .orElse(sys.env.get("CHEKHOV_VIDEO_CAPTURE"))
           .flatMap(ArtifactCapture.fromString)
           .getOrElse(ArtifactCapture.Off),
+        executablePath = sys.props
+          .get("chekhov.executablePath")
+          .orElse(sys.env.get("CHEKHOV_EXECUTABLE_PATH"))
+          .filter(_.nonEmpty),
+        channel = sys.props
+          .get("chekhov.channel")
+          .orElse(sys.env.get("CHEKHOV_CHANNEL"))
+          .filter(_.nonEmpty),
+        launchArgs = sys.props
+          .get("chekhov.launchArgs")
+          .orElse(sys.env.get("CHEKHOV_LAUNCH_ARGS"))
+          .map(_.split("[,\\s]+").iterator.map(_.trim).filter(_.nonEmpty).toList)
+          .getOrElse(Nil),
       )
 
   def layer(config: ChekhovConfig): ULayer[ChekhovConfig] =
