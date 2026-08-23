@@ -111,6 +111,55 @@ There is no skip flag. If a module's `test` must stay cheap, put `ChekhovSuite`s
 separate sbt project (`e2e`) and leave unit tests in `core`. `sbt core/test` never
 launches browsers; `sbt e2e/test` does.
 
+### System browsers
+
+Chekhov normally launches the browser revision that `sbt chekhovInstall` downloaded for the
+pinned Playwright version. To run against a browser already on the machine (a distro package,
+a managed install, or a channel like Google Chrome), point it at that instead. Three keys do
+it; each reads a `-Dchekhov.*` system property first, then a `CHEKHOV_*` environment variable
+(props win):
+
+| What | System property | Environment variable |
+|------|-----------------|----------------------|
+| Browser binary | `chekhov.executablePath` | `CHEKHOV_EXECUTABLE_PATH` |
+| Installed channel (Chromium only) | `chekhov.channel` | `CHEKHOV_CHANNEL` |
+| Extra process args | `chekhov.launchArgs` | `CHEKHOV_LAUNCH_ARGS` |
+
+Setting either `executablePath` or `channel` skips the pinned-browser-revision check. The
+Playwright driver CLI is still required and must match the pin, so keep running
+`sbt chekhovInstall`; only the downloaded browser binary is bypassed.
+
+```bash
+# A system Chromium with no sandbox (NixOS, CI containers). Env vars are inherited by the
+# forked test JVM, so this needs no build change:
+CHEKHOV_EXECUTABLE_PATH=/usr/bin/chromium CHEKHOV_LAUNCH_ARGS="--no-sandbox" sbt e2e/testFull
+
+# An installed channel instead of a binary path (Chromium family only):
+CHEKHOV_CHANNEL=chrome sbt e2e/testFull
+```
+
+`launchArgs` is a flag list: comma or whitespace separates arguments, and an argument that
+takes a value uses `--flag=value`. So `"--no-sandbox --disable-gpu"` becomes two args. A value
+containing a space cannot be expressed; use the `=` form or a file-based option instead.
+
+The sbt plugin forwards `browser`, `browsers`, `headless`, and `artifactsDir` to the test JVM
+but not these three keys. Set them as environment variables, add `-Dchekhov.channel=chrome`
+(and friends) to `Test / javaOptions`, or override in code:
+
+```scala
+class MySuite extends ChekhovSuite {
+  override def chekhovConfig: ChekhovConfig =
+    super.chekhovConfig.copy(
+      executablePath = Some("/usr/bin/chromium"),
+      launchArgs     = List("--no-sandbox"),
+    )
+}
+```
+
+`chekhov.channel` is Chromium-only. Setting it while `chekhov.browser` is Firefox or WebKit
+fails fast at launch with a message naming the keys, rather than surfacing as an opaque
+Playwright protocol error.
+
 ### Artifacts
 
 Default `artifactsDir` is `target/chekhov` (override with `-Dchekhov.artifactsDir` / `CHEKHOV_ARTIFACTS_DIR`):
