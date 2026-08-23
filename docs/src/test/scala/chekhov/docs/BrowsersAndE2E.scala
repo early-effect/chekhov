@@ -98,5 +98,45 @@ the first entry. Without the plugin, `-Dchekhov.browsers=firefox,chromium` or
         )
       },
     ),
+    section("Use a system browser")(
+      md"""
+Point Chekhov at a browser already on the machine instead of the revision `sbt chekhovInstall`
+downloaded. Three keys do it; each reads a `-Dchekhov.*` system property first, then a
+`CHEKHOV_*` environment variable (props win):
+
+| Key | Property | Env var |
+|-----|----------|---------|
+| Browser binary | `chekhov.executablePath` | `CHEKHOV_EXECUTABLE_PATH` |
+| Installed channel (Chromium only) | `chekhov.channel` | `CHEKHOV_CHANNEL` |
+| Extra process args | `chekhov.launchArgs` | `CHEKHOV_LAUNCH_ARGS` |
+
+Setting either `executablePath` or `channel` skips the pinned-browser-revision check. The
+Playwright driver CLI is still required and must match the pin, so keep running
+`sbt chekhovInstall`; only the downloaded browser binary is bypassed.
+
+```bash
+CHEKHOV_EXECUTABLE_PATH=/usr/bin/chromium CHEKHOV_LAUNCH_ARGS="--no-sandbox" sbt e2e/testFull
+```
+
+`launchArgs` is a flag list: comma or whitespace separates arguments, and an argument that
+takes a value uses `--flag=value`. An empty string is treated as unset for every key, so
+`CHEKHOV_HEADLESS=""` leaves headless at its default. The example resolves the keys exactly
+the way the driver does: the property wins over the env var, the empty value stays unset, and
+the flag list splits into two args.
+""",
+      exampleValue {
+        val config = ChekhovConfig.fromProps(
+          props = Map("chekhov.executablePath" -> "/usr/bin/chromium", "chekhov.headless" -> ""),
+          env = Map("CHEKHOV_EXECUTABLE_PATH" -> "/opt/ignored", "CHEKHOV_LAUNCH_ARGS" -> "--no-sandbox, --disable-gpu"),
+        )
+        (config.executablePath, config.headless, config.launchArgs)
+      }.assert { case (path, headless, args) =>
+        assertTrue(
+          path.contains("/usr/bin/chromium"),           // property wins over env var
+          headless == true,                             // empty string is unset; default holds
+          args == List("--no-sandbox", "--disable-gpu"), // comma / whitespace split
+        )
+      },
+    ),
   )
 end BrowsersAndE2E

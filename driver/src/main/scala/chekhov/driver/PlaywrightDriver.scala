@@ -10,6 +10,22 @@ import zio.json.ast.Json
 /** Playwright channel-backed implementations of Chekhov algebras (saferis-style layers). */
 object PlaywrightDriver:
 
+  /** A system browser (executablePath / channel) needs no downloaded revision. */
+  def usesSystemBrowser(config: ChekhovConfig): Boolean =
+    config.executablePath.isDefined || config.channel.isDefined
+
+  /** `browserType.launch` params from config; `ci` disables the Chromium sandbox. */
+  def launchParams(config: ChekhovConfig, ci: Boolean): Commands.BrowserTypeLaunch =
+    Commands.BrowserTypeLaunch(
+      headless = Some(config.headless),
+      chromiumSandbox = if ci then Some(false) else None,
+      executablePath = config.executablePath,
+      channel = config.channel,
+      args =
+        if config.launchArgs.nonEmpty then Some(Json.Arr(config.launchArgs.map(Json.Str(_))*))
+        else None,
+    )
+
   final case class BrowserTypeService(
       conn: ChannelConnection,
       browser: ChekhovBrowser,
@@ -20,28 +36,25 @@ object PlaywrightDriver:
     def launch(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, Browser] =
       for
         config <- ZIO.service[ChekhovConfig]
+        // Playwright channels are Chromium-only; fail fast instead of a raw protocol error.
+        _ <- ZIO.fromEither(
+          if config.channel.isDefined && config.browser != ChekhovBrowser.Chromium then
+            Left(
+              ChekhovError.Driver(
+                s"chekhov.channel requires chekhov.browser=chromium (got ${config.browser.channelName})"
+              )
+            )
+          else Right(())
+        )
         // A system browser (executablePath / channel) needs no downloaded revision.
-        systemBrowser = config.executablePath.isDefined || config.channel.isDefined
         _ <- ZIO
           .fromEither(PinnedPlaywright.requireBrowser(config.browser))
           .mapError(p => ChekhovError.Driver(p.message))
-          .unless(systemBrowser)
+          .unless(usesSystemBrowser(config))
         // GitHub Actions / containers: Chromium needs the sandbox disabled.
         ci = sys.env.get("CI").contains("true") || sys.env.get("GITHUB_ACTIONS").contains("true")
-        result <- conn.send(
-          typeGuid,
-          "launch",
-          Commands.BrowserTypeLaunch(
-            headless = Some(config.headless),
-            chromiumSandbox = if ci then Some(false) else None,
-            executablePath = config.executablePath,
-            channel = config.channel,
-            args =
-              if config.launchArgs.nonEmpty then Some(Json.Arr(config.launchArgs.map(Json.Str(_))*))
-              else None,
-          ),
-        )
-        guid <- guidOf(result, "browser")
+        result <- conn.send(typeGuid, "launch", launchParams(config, ci))
+        guid   <- guidOf(result, "browser")
         b = BrowserLive(conn, guid)
         _ <- ZIO.addFinalizer(b.close)
       yield b

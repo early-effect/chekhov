@@ -33,6 +33,14 @@ object ProtocolCoverageSpec extends ZIOSpecDefault:
         val encoded = List(
           Commands.Initialize("java").toJson,
           Commands.BrowserTypeLaunch(headless = Some(true)).toJson,
+          Commands
+            .BrowserTypeLaunch(
+              headless = Some(true),
+              executablePath = Some("/usr/bin/chromium"),
+              channel = Some("chrome"),
+              args = Some(Json.Arr(Json.Str("--no-sandbox"))),
+            )
+            .toJson,
           Commands.PageGoto(url = "http://localhost").toJson,
           Commands.PageClick(selector = "button").toJson,
           Commands.PageFill(selector = "input", value = "x").toJson,
