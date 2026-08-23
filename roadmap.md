@@ -2,7 +2,7 @@
 
 Named for Chekhov's gun: if the UI shows a control, a test should be able to fire it.
 
-Chekhov is an Early Effect **ZIO-first Playwright client**: pinned `protocol.yml` → Scala AST + zio-json codecs + framed channel transport, ZIO algebras, JSEnv / `chekhov-dom`, scoped Vite serve, multi-engine zipx CI, Specular hub, Apache-2.0.
+Chekhov is an Early Effect **ZIO-first Playwright client**: pinned `protocol.yml` → Scala AST + zio-json codecs + framed channel transport, ZIO algebras, JSEnv / `chekhov-dom`, scoped static / process serve, multi-engine zipx CI, Specular hub, Apache-2.0.
 
 **Not** a wrap of `com.microsoft.playwright`. **Not** a reimplementation of the Playwright server. Sibling niche to [DanHodges/scalajs-playwright](https://github.com/DanHodges/scalajs-playwright), but JVM/ZIO + official Node driver protocol.
 
@@ -20,7 +20,7 @@ Stack target: Scala **3.8.4**, ZIO **2.1.x**, sbt **2.x**, Scala.js **1.22**, Pl
 | Test runner | zio-test only |
 | Engines | Chromium, Firefox, WebKit (first-class) |
 | Lifecycle | ZIO `Scope` / `ZLayer.scoped` / `acquireRelease` (saferis-style capabilities) |
-| Serve under test | Scoped process + URL readiness; primary recipe Vite |
+| Serve under test | Scoped process + URL readiness; primary recipe `StaticFileServer` (splice for Scala.js fixtures) |
 | Artifacts | `target/chekhov` (screenshots, traces, video, serve logs) |
 | DOM helpers | `chekhov-dom` on **scalajs-dom** (no ascent in core) |
 | Org / license | `rocks.earlyeffect`, Apache-2.0, dynver, zipx, Specular docs |
@@ -125,19 +125,19 @@ Still curated (not generated from YAML field lists):
 
 ---
 
-## Phase 1c — Scoped Vite
+## Phase 1c — Scoped serve
 
 **Status: Done (MVP)**
 
 ### Done
 
-- `AppServer` / `ServeConfig` / `AppServer.vite` / `viteLayer` (scoped process + readiness + log under `target/chekhov/serve`)
-- `examples/vite-fixture` (Vite 7 + module script) + gated `ViteFixtureSpec` (Chromium)
-- zipx Verify: `npm ci --prefix examples/vite-fixture` after root `npm ci`
+- `AppServer` / `ServeConfig` / `AppServer.serve` / `AppServer.layer` (generic scoped process + readiness + log under `target/chekhov/serve`)
+- `StaticFileServer` for a directory of HTML/JS; ascent fixture served via `sbt-splice` (`spliceFast` → `target/serve/fast.js`) + `StaticFileServer`
+- `examples/vite-fixture` removed (Vite dropped from the repo and public API)
 
 ### Next
 
-- Optional: multi-engine Vite dogfood; suite-owned Vite in more than one driver suite
+- Optional: multi-engine dogfood of `AppServer.serve` against a consumer's own dev server
 
 ---
 
@@ -177,9 +177,8 @@ Still curated (not generated from YAML field lists):
 
 ### Done
 
-- `examples/ascent-fixture`: Maven `ascent-js` counter + Vite; `SCALAJS_OUT_DIR` avoids Vite↔sbt deadlock
-- `AscentFixtureSpec`: Chromium / Firefox / WebKit (`driver/test` depends on `writeAscentFixtureOut` → `fastLinkJS`)
-- `AppServer.vite`: host/port/`--open=false` + `BROWSER=none`
+- `examples/ascent-fixture`: Maven `ascent-js` counter; `sbt-splice` links `target/serve/fast.js`, staged next to `index.html` and served by `StaticFileServer`
+- `AscentFixtureSpec`: Chromium / Firefox / WebKit (`driver/test` stages the fixture via `stageAscentFixture` → `spliceFast`)
 - `getByPlaceholder` via CSS; `Page.keyboardPress`; `ChekhovSuite` includes `BrowserContext`
 - In-repo `chekhov-ascent` (`withMounted` over `chekhov-dom` + `ascent-js`)
 
@@ -216,14 +215,14 @@ Still curated (not generated from YAML field lists):
 - `com.microsoft.playwright` or other official binding JARs as deps or public API
 - Replacing `@playwright/test` / UI Mode / Node codegen
 - Bundling ascent or Specular into core; ascent DOM instead of scalajs-dom
-- Driving `fastLinkJS` / replacing vite-plugin-scalajs
+- Driving `fastLinkJS` / a Scala.js bundler plugin (sbt-splice covers linking for the fixture)
 - Scala.js-on-Node npm `playwright` façade (DanHodges path)
 
 ---
 
 ## Success criteria
 
-- ~15-line `ChekhovSuite` E2E with algebras + optional `Chekhov.vite`; classpath free of Playwright Java
+- ~15-line `ChekhovSuite` E2E with algebras; classpath free of Playwright Java
 - Pinned `protocol.yml` → AST + zio-json codecs; protocol coverage gate green for claimed surface
 - JSEnv + `chekhov-dom` without `js.Dynamic` boilerplate for common queries
 - CI: Chromium, Firefox, WebKit for driver dogfood and JSEnv smoke; scoped cleanup of serve + driver + browsers

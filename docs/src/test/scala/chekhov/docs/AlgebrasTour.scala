@@ -39,7 +39,7 @@ need a channel method that is not claimed yet.
 |-------|------|
 | `ChekhovConfig.layer` | browser, headless, `baseUrl`, `artifactsDir` |
 | `PlaywrightDriver.suiteLayers` | transport + browser type + shared browser + context + page |
-| `AppServer.viteLayer` / `StaticFileServer.layer` | scoped serve |
+| `StaticFileServer.layer` / `AppServer.layer` | scoped serve |
 | `ChekhovSuite.fullStack` | config service ++ driver suite layers |
 
 Override `chekhovLayerFor` on the suite when you need serve + stack together

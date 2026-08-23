@@ -6,7 +6,7 @@ import zio.*
 import java.net.InetSocketAddress
 import java.nio.file.{Files, Path}
 
-/** Serve a directory of static files (Phase 1 dogfood without Vite). */
+/** Serve a directory of static files. */
 object StaticFileServer:
 
   def serve(dir: Path, host: String = "127.0.0.1", port: Int = 0)(using

@@ -13,7 +13,7 @@ trait ChekhovSuite extends ZIOSpecDefault:
   /** Override to customize config (browser, baseUrl, artifactsDir, trace/video capture). */
   def chekhovConfig: ChekhovConfig = ChekhovConfig()
 
-  /** Stack for one config (override to add Vite / static serve). Fanned out per `chekhovBrowsers`. */
+  /** Stack for one config (override to add static serve or `AppServer.layer`). Fanned out per `chekhovBrowsers`. */
   def chekhovLayerFor(cfg: ChekhovConfig): ZLayer[Any, ChekhovError, ChekhovSuite.Env] =
     ZLayer.succeed(cfg) >>> ChekhovSuite.fullStack
 

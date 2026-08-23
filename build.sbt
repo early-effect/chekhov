@@ -151,12 +151,6 @@ def chekhovBrowserSetup(pins: ActionPins): Steps =
       .named("Set up Node")
       .withInputs(ListMap("node-version" -> "24", "cache" -> "npm")),
     Step.run(Script(Exec("npm", Word.lit("ci")))).named("npm ci"),
-    Step
-      .run(Script(Exec("npm", Word.lit("ci"), Word.lit("--prefix"), Word.lit("examples/vite-fixture"))))
-      .named("npm ci (vite fixture)"),
-    Step
-      .run(Script(Exec("npm", Word.lit("ci"), Word.lit("--prefix"), Word.lit("examples/ascent-fixture"))))
-      .named("npm ci (ascent fixture)"),
     // Browsers under target/ms-playwright (zipxEnv) ride LocalDir; apt .debs are mirrored
     // into ~/.cache/chekhov-apt-archives so install-deps can reuse them across runs.
     Step.run(installBrowsers).named("Install Playwright browsers"),
@@ -204,7 +198,7 @@ val commonScalacOptions = Seq(
 val zioTestSettings = Def.settings(
   MyVersions.zioTests,
   Test / mainClass := None,
-  // Playwright channel + Vite fixtures share Node / ports; parallel suites race on CI.
+  // Playwright channel + shared ports: parallel suites race on CI.
   Test / parallelExecution := false,
 )
 
@@ -287,16 +281,33 @@ lazy val `ascent-fixture` = (project in file("examples/ascent-fixture"))
     publish / skip := true,
     scalacOptions ++= commonScalacOptions,
     scalaJSUseMainModuleInitializer := true,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.NoModule) },
     MyVersions.ascentLib,
+    spliceFastOutput := Def.uncached(baseDirectory.value / "target" / "serve" / "fast.js"),
   )
 
-lazy val writeAscentFixtureOut = taskKey[File]("Write ascent-fixture fastLinkJSOutput path for Vite")
-writeAscentFixtureOut := Def.uncached {
-  val out    = (`ascent-fixture` / Compile / fastLinkJSOutput).value
-  val marker = (`ascent-fixture` / baseDirectory).value / "scalajs-out-dir"
-  IO.write(marker, out.getAbsolutePath)
-  marker
+lazy val stageAscentFixture = taskKey[File]("Stage ascent-fixture index.html + spliceFast JS for StaticFileServer")
+stageAscentFixture := Def.uncached {
+  val js   = (`ascent-fixture` / spliceFast).value
+  val dest = (`ascent-fixture` / baseDirectory).value / "target" / "serve"
+  IO.createDirectory(dest)
+  IO.write(
+    dest / "index.html",
+    """<!doctype html>
+      |<html lang="en">
+      |<head>
+      |  <meta charset="utf-8" />
+      |  <title>chekhov · ascent fixture</title>
+      |  <style>body { margin: 0; font-family: system-ui, sans-serif; padding: 1.5rem; }</style>
+      |</head>
+      |<body>
+      |  <script src="./fast.js"></script>
+      |</body>
+      |</html>
+      |""".stripMargin,
+  )
+  val _ = js
+  dest
 }
 
 lazy val driver = (project in file("driver"))
@@ -307,7 +318,7 @@ lazy val driver = (project in file("driver"))
     MyVersions.zioProtocol,
     zioTestSettings,
     Test / loadedTestFrameworks := Def.uncached {
-      writeAscentFixtureOut.value
+      stageAscentFixture.value
       (Test / loadedTestFrameworks).value
     },
   )

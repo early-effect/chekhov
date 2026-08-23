@@ -48,45 +48,8 @@ object AppServer:
     yield new AppServer:
       val baseUrl = config.readyUrl
 
-  def vite(
-      dir: Path,
-      port: Int = 5173,
-      command: List[String] = List("npm", "run", "dev"),
-      env: Map[String, String] = Map.empty,
-  )(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, AppServer] =
-    // `--open false` is a path, not a boolean; config often has open: true
-    val withPort =
-      if command == List("npm", "run", "dev") then
-        command ++ List(
-          "--",
-          "--host",
-          "127.0.0.1",
-          "--port",
-          port.toString,
-          "--strictPort",
-          "--open=false",
-        )
-      else command
-    serve(
-      ServeConfig(
-        command = withPort,
-        cwd = dir,
-        readyUrl = s"http://127.0.0.1:$port",
-        readyTimeout = 45.seconds,
-        env = Map("BROWSER" -> "none") ++ env,
-      )
-    )
-  end vite
-
   def layer(config: ServeConfig): ZLayer[ChekhovConfig, ChekhovError, AppServer] =
     ZLayer.scoped(serve(config))
-
-  def viteLayer(
-      dir: Path,
-      port: Int = 5173,
-      env: Map[String, String] = Map.empty,
-  ): ZLayer[ChekhovConfig, ChekhovError, AppServer] =
-    ZLayer.scoped(vite(dir, port, env = env))
 
   private def waitUntilReady(url: String, timeout: Duration, process: Process, logFile: Path)(using
       Trace

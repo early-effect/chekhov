@@ -4,23 +4,12 @@ import chekhov.*
 import zio.*
 import zio.test.*
 
-import java.nio.file.{Files, Path}
+import java.nio.file.Path
 
-/** E2E against `examples/ascent-fixture`. */
+/** E2E against `examples/ascent-fixture`, served from the staged `target/serve` directory. */
 object AscentFixtureSpec extends ZIOSpecDefault:
 
-  private val port       = 5175
-  private val fixtureDir = Path.of("examples/ascent-fixture").toAbsolutePath.normalize
-  private val outMarker  = fixtureDir.resolve("scalajs-out-dir")
-
-  private def fixturePresent: Boolean =
-    Files.isRegularFile(fixtureDir.resolve("package.json"))
-
-  private val onlyIfReady: TestAspectPoly =
-    new TestAspect.PerTest.AtLeastR[Any]:
-      def perTest[R, E](test: ZIO[R, TestFailure[E], TestSuccess])(using Trace) =
-        if fixturePresent then test
-        else ZIO.succeed(TestSuccess.Ignored())
+  private val serveDir = Path.of("examples/ascent-fixture/target/serve").toAbsolutePath.normalize
 
   override def aspects =
     Chunk(
@@ -28,16 +17,6 @@ object AscentFixtureSpec extends ZIOSpecDefault:
       TestAspect.timeout(90.seconds),
       TestAspect.sequential,
     )
-
-  private def scalajsOutDir: IO[ChekhovError, Path] =
-    ZIO
-      .attempt(Path.of(Files.readString(outMarker).trim))
-      .mapError(e =>
-        ChekhovError.Serve(
-          s"Missing $outMarker (driver/test should depend on writeAscentFixtureOut): $e",
-          Some(e),
-        )
-      )
 
   private def waitForInc(page: Page): IO[ChekhovError, Unit] =
     waitForTrue(
@@ -71,14 +50,6 @@ object AscentFixtureSpec extends ZIOSpecDefault:
     loop.timeoutFail(ChekhovError.Timeout(timeoutMsg))(timeout)
   end waitForTrue
 
-  private def viteLayer: ZLayer[ChekhovConfig, ChekhovError, AppServer] =
-    ZLayer.scoped {
-      for
-        outDir <- scalajsOutDir
-        server <- AppServer.vite(fixtureDir, port, env = Map("SCALAJS_OUT_DIR" -> outDir.toString))
-      yield server
-    }
-
   private def runOn(browser: ChekhovBrowser) =
     test(s"${browser.channelName}: increment counter") {
       val config = ChekhovConfig(
@@ -97,7 +68,7 @@ object AscentFixtureSpec extends ZIOSpecDefault:
         after  <- page.innerText("#count")
       yield assertTrue(before == "0", after == "1")).provide(
         ZLayer.succeed(config),
-        viteLayer,
+        StaticFileServer.layer(serveDir),
         PlaywrightDriver.suiteLayers,
       )
     }
@@ -107,5 +78,5 @@ object AscentFixtureSpec extends ZIOSpecDefault:
       runOn(ChekhovBrowser.Chromium),
       runOn(ChekhovBrowser.Firefox),
       runOn(ChekhovBrowser.WebKit),
-    ) @@ onlyIfReady
+    )
 end AscentFixtureSpec
