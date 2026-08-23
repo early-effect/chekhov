@@ -402,23 +402,15 @@ lazy val docs = (project in file("docs"))
     publish / skip := true,
     scalacOptions ++= commonScalacOptions,
     MyVersions.docsTest,
-    // specular-site still declares zio-json 0.9.x
+    // Pin docs to the catalog zio-json in case specular-site's transitive pin drifts from it.
     dependencyOverrides += MyVersions.moduleID(MyVersions.zioJson),
     zioTestSettings,
     specularBuildMain     := "chekhov.docs.BuildSite",
     specularMetaProject   := Some(LocalProject("core")),
     specularArtifactKind  := "library",
     specularSiteDirectory := (ThisBuild / baseDirectory).value / "target" / "site",
-    // Docs-only (workflow_dispatch) builds are dynver `-ci`; don't advertise that as a Central coord.
-    specularDisplayVersion := {
-      val v = (ThisBuild / version).value
-      if (v.endsWith("-ci") || v.endsWith("-SNAPSHOT")) then {
-        previousStableVersion.value.getOrElse("<version>")
-      }
-      else {
-        ""
-      }
-    },
+    // CI docs builds are dynver `-ci`; stripCi drops the suffix so install snippets show the last published tag.
+    specularDisplayVersion := stripCi,
   )
 
 // Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.
