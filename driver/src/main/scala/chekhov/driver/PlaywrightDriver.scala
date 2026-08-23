@@ -20,9 +20,12 @@ object PlaywrightDriver:
     def launch(using Trace): ZIO[Scope & ChekhovConfig, ChekhovError, Browser] =
       for
         config <- ZIO.service[ChekhovConfig]
-        _      <- ZIO
+        // A system browser (executablePath / channel) needs no downloaded revision.
+        systemBrowser = config.executablePath.isDefined || config.channel.isDefined
+        _ <- ZIO
           .fromEither(PinnedPlaywright.requireBrowser(config.browser))
           .mapError(p => ChekhovError.Driver(p.message))
+          .unless(systemBrowser)
         // GitHub Actions / containers: Chromium needs the sandbox disabled.
         ci = sys.env.get("CI").contains("true") || sys.env.get("GITHUB_ACTIONS").contains("true")
         result <- conn.send(
@@ -31,6 +34,11 @@ object PlaywrightDriver:
           Commands.BrowserTypeLaunch(
             headless = Some(config.headless),
             chromiumSandbox = if ci then Some(false) else None,
+            executablePath = config.executablePath,
+            channel = config.channel,
+            args =
+              if config.launchArgs.nonEmpty then Some(Json.Arr(config.launchArgs.map(Json.Str(_))*))
+              else None,
           ),
         )
         guid <- guidOf(result, "browser")
