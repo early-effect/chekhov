@@ -48,12 +48,12 @@ object ChekhovAscentSpec extends ZIOSpecDefault:
       },
       test("withMounted removes the chekhov root on exit") {
         for
-          before <- ZIO.succeed(dom.document.querySelectorAll("[data-chekhov-root]").length)
+          ref    <- Ref.make[Option[dom.Element]](None)
           during <- withMounted(E.div(testId("x"), "hi")) { root =>
-            ZIO.succeed(root.getAttribute("data-chekhov-root") == "true")
+            ref.set(Some(root)).as(root.getAttribute("data-chekhov-root") == "true")
           }
-          after <- ZIO.succeed(dom.document.querySelectorAll("[data-chekhov-root]").length)
-        yield assertTrue(before == 0, during, after == 0)
+          detached <- ref.get.map(_.exists(el => !el.isConnected))
+        yield assertTrue(during, detached)
       },
     )
 
