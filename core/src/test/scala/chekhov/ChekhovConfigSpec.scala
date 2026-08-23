@@ -3,6 +3,8 @@ package chekhov
 import zio.*
 import zio.test.*
 
+import java.nio.file.Path
+
 object ChekhovConfigSpec extends ZIOSpecDefault:
   def spec =
     suite("ChekhovConfig")(
@@ -35,6 +37,61 @@ object ChekhovConfigSpec extends ZIOSpecDefault:
           ChekhovBrowser.configured(props = Map.empty, env = Map.empty) == List(ChekhovBrowser.Chromium),
           ChekhovBrowser.configured(props = Map("chekhov.browsers" -> "webkit,firefox"), env = Map.empty) ==
             List(ChekhovBrowser.WebKit, ChekhovBrowser.Firefox),
+        )
+      },
+      test("fromProps prefers system properties over env vars") {
+        val propWins = ChekhovConfig.fromProps(
+          props = Map("chekhov.executablePath" -> "/opt/prop"),
+          env = Map("CHEKHOV_EXECUTABLE_PATH" -> "/opt/env"),
+        )
+        val envOnly = ChekhovConfig.fromProps(props = Map.empty, env = Map("CHEKHOV_EXECUTABLE_PATH" -> "/opt/env"))
+        assertTrue(
+          propWins.executablePath.contains("/opt/prop"),
+          envOnly.executablePath.contains("/opt/env"),
+        )
+      },
+      test("fromProps reads channel from sysprop or env") {
+        assertTrue(
+          ChekhovConfig
+            .fromProps(props = Map("chekhov.channel" -> "chrome"), env = Map.empty)
+            .channel
+            .contains("chrome"),
+          ChekhovConfig
+            .fromProps(props = Map.empty, env = Map("CHEKHOV_CHANNEL" -> "msedge"))
+            .channel
+            .contains("msedge"),
+        )
+      },
+      test("fromProps treats empty strings as unset") {
+        val config = ChekhovConfig.fromProps(
+          props = Map(
+            "chekhov.headless"       -> "",
+            "chekhov.baseUrl"        -> "",
+            "chekhov.artifactsDir"   -> "",
+            "chekhov.executablePath" -> "",
+            "chekhov.channel"        -> "",
+            "chekhov.launchArgs"     -> "",
+          ),
+          env = Map.empty,
+        )
+        assertTrue(
+          config.headless,
+          config.baseUrl.isEmpty,
+          config.artifactsDir == Path.of("target", "chekhov"),
+          config.executablePath.isEmpty,
+          config.channel.isEmpty,
+          config.launchArgs.isEmpty,
+        )
+      },
+      test("fromProps splits launchArgs on commas and whitespace") {
+        assertTrue(
+          ChekhovConfig
+            .fromProps(props = Map.empty, env = Map("CHEKHOV_LAUNCH_ARGS" -> "--no-sandbox --disable-gpu"))
+            .launchArgs == List("--no-sandbox", "--disable-gpu"),
+          ChekhovConfig.fromProps(props = Map.empty, env = Map("CHEKHOV_LAUNCH_ARGS" -> "--a=1,--b=2")).launchArgs ==
+            List("--a=1", "--b=2"),
+          ChekhovConfig.fromProps(props = Map("chekhov.launchArgs" -> "  --x ,  --y "), env = Map.empty).launchArgs ==
+            List("--x", "--y"),
         )
       },
       test("ArtifactCapture fromString") {
