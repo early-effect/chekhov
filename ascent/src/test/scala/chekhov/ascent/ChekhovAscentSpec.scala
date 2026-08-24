@@ -55,6 +55,51 @@ object ChekhovAscentSpec extends ZIOSpecDefault:
           detached <- ref.get.map(_.exists(el => !el.isConnected))
         yield assertTrue(during, detached)
       },
+      test("concurrent withMounted scopes are isolated from each other") {
+        // Rendezvous: each scope signals readiness and waits for the other, so the cross checks
+        // below run while both iframes are alive in the shared parent document.
+        def scope(
+            tag: String,
+            other: String,
+            ref: Ref[Option[dom.Element]],
+            ready: Promise[Nothing, Unit],
+            otherReady: Promise[Nothing, Unit],
+        ) =
+          withMounted(E.div(testId(tag), tag)) { root =>
+            for
+              _  <- ref.set(Some(root))
+              _  <- ready.succeed(())
+              _  <- otherReady.await
+              ok <- ZIO.succeed(
+                root.getAttribute("data-chekhov-root") == "true" &&
+                  !root.ownerDocument.eq(dom.document) &&
+                  Option(root.querySelector(s"""[data-testid="$other"]""")).isEmpty &&
+                  Option(dom.document.querySelector(s"""[data-testid="$tag"]""")).isEmpty
+              )
+            yield ok
+          }
+
+        for
+          ra         <- Ref.make[Option[dom.Element]](None)
+          rb         <- Ref.make[Option[dom.Element]](None)
+          inA        <- Promise.make[Nothing, Unit]
+          inB        <- Promise.make[Nothing, Unit]
+          (okA, okB) <-
+            scope("iso-a", "iso-b", ra, inA, inB).zipPar(scope("iso-b", "iso-a", rb, inB, inA))
+          a <- ra.get
+          b <- rb.get
+        yield assertTrue(
+          okA,
+          okB,
+          (a, b) match
+            case (Some(x), Some(y)) => !x.ownerDocument.eq(y.ownerDocument)
+            case _                  => false
+          ,
+          a.forall(!_.isConnected),
+          b.forall(!_.isConnected),
+        )
+        end for
+      },
     )
 
   private def waitForText(root: dom.Element, testIdName: String, expected: String)(using Trace): IO[Throwable, String] =

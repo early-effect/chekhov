@@ -56,5 +56,55 @@ object ChekhovDomSpec extends ZIOSpecDefault:
           yield assertTrue(t.contains("Go"))
         }
       },
+      test("concurrent withRoot scopes are isolated from each other") {
+        // Rendezvous: each scope signals readiness and waits for the other, so the cross checks
+        // below run while both iframes are alive in the shared parent document.
+        def scope(
+            tag: String,
+            other: String,
+            ref: Ref[Option[dom.Element]],
+            ready: Promise[Nothing, Unit],
+            otherReady: Promise[Nothing, Unit],
+        ) =
+          withRoot { root =>
+            for
+              _ <- ZIO.succeed {
+                val el = root.ownerDocument.createElement("span")
+                el.setAttribute("data-testid", tag)
+                root.appendChild(el)
+              }
+              _  <- ref.set(Some(root))
+              _  <- ready.succeed(())
+              _  <- otherReady.await
+              ok <- ZIO.succeed(
+                root.getAttribute("data-chekhov-root") == "true" &&
+                  !root.ownerDocument.eq(dom.document) &&
+                  Option(root.querySelector(s"""[data-testid="$other"]""")).isEmpty &&
+                  Option(dom.document.querySelector(s"""[data-testid="$tag"]""")).isEmpty
+              )
+            yield ok
+          }
+
+        for
+          ra         <- Ref.make[Option[dom.Element]](None)
+          rb         <- Ref.make[Option[dom.Element]](None)
+          inA        <- Promise.make[Nothing, Unit]
+          inB        <- Promise.make[Nothing, Unit]
+          (okA, okB) <-
+            scope("scope-a", "scope-b", ra, inA, inB).zipPar(scope("scope-b", "scope-a", rb, inB, inA))
+          a <- ra.get
+          b <- rb.get
+        yield assertTrue(
+          okA,
+          okB,
+          (a, b) match
+            case (Some(x), Some(y)) => !x.ownerDocument.eq(y.ownerDocument)
+            case _                  => false
+          ,
+          a.forall(!_.isConnected),
+          b.forall(!_.isConnected),
+        )
+        end for
+      },
     )
 end ChekhovDomSpec

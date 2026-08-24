@@ -557,11 +557,19 @@ object PlaywrightDriver:
   val pageLayer: ZLayer[BrowserContext, ChekhovError, Page] =
     ZLayer.scoped(ZIO.serviceWithZIO[BrowserContext](_.newPage))
 
+  /** Shared process: ArtifactSession + transport + BrowserType + Browser. */
+  val processLayers: ZLayer[ChekhovConfig, ChekhovError, ArtifactSession & BrowserType & Browser] =
+    ArtifactSession.live >+> (withBrowserType >+> browserLayer)
+
+  /** Per-test page: new context + page on the shared browser. */
+  val pageLayers: ZLayer[ChekhovConfig & ArtifactSession & Browser, ChekhovError, BrowserContext & Page] =
+    contextLayer >+> pageLayer
+
   /** Common suite stack: config in → session + BrowserType + Browser + BrowserContext + Page out. */
   val suiteLayers: ZLayer[
     ChekhovConfig,
     ChekhovError,
     ArtifactSession & BrowserType & Browser & BrowserContext & Page,
   ] =
-    ArtifactSession.live >+> (withBrowserType >+> browserLayer >+> contextLayer >+> pageLayer)
+    processLayers >+> pageLayers
 end PlaywrightDriver

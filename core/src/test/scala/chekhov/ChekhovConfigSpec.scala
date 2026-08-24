@@ -71,6 +71,7 @@ object ChekhovConfigSpec extends ZIOSpecDefault:
             "chekhov.executablePath" -> "",
             "chekhov.channel"        -> "",
             "chekhov.launchArgs"     -> "",
+            "chekhov.keepOpen"       -> "",
           ),
           env = Map.empty,
         )
@@ -81,6 +82,7 @@ object ChekhovConfigSpec extends ZIOSpecDefault:
           config.executablePath.isEmpty,
           config.channel.isEmpty,
           config.launchArgs.isEmpty,
+          !config.keepOpen,
         )
       },
       test("fromProps splits launchArgs on commas and whitespace") {
@@ -101,12 +103,21 @@ object ChekhovConfigSpec extends ZIOSpecDefault:
           ArtifactCapture.fromString("always").contains(ArtifactCapture.Always),
         )
       },
+      test("fromProps prefers keepOpen system property over env") {
+        val propWins = ChekhovConfig.fromProps(
+          props = Map("chekhov.keepOpen" -> "true"),
+          env = Map("CHEKHOV_KEEP_OPEN" -> "false"),
+        )
+        val envOnly = ChekhovConfig.fromProps(props = Map.empty, env = Map("CHEKHOV_KEEP_OPEN" -> "true"))
+        assertTrue(propWins.keepOpen, envOnly.keepOpen)
+      },
       test("default layer") {
         for c <- ZIO.service[ChekhovConfig]
         yield assertTrue(
           c.artifactsDir.toString.contains("chekhov"),
           c.traceCapture == ArtifactCapture.Off,
           c.videoCapture == ArtifactCapture.Off,
+          !c.keepOpen,
         )
       }.provideLayer(ChekhovConfig.layer),
     ) @@ TestAspect.timeout(10.seconds)

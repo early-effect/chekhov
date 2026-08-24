@@ -302,9 +302,16 @@ Services are traits with `ZLayer` companions:
 
 - `ChannelTransport.layer` — scoped Node `run-driver` pipe
 - `ChannelConnection.layer` — initialize + request/response
-- `PlaywrightDriver.withBrowserType` / `browserLayer` / `pageLayer`
+- `PlaywrightDriver.withBrowserType` / `browserLayer` / `pageLayer`: building blocks
+- `PlaywrightDriver.processLayers`: shared run-driver + one browser per spec / browser fan-out
+- `PlaywrightDriver.pageLayers`: fresh `BrowserContext` + `Page` per test; concurrent tests in a suite each get their own page
+- `PlaywrightDriver.suiteLayers`: one-shot composition of process + page (what `ChekhovSuite` uses)
 - `AppServer.layer(config)` / `StaticFileServer.layer(dir)` — scoped serve + readiness
 - `ChekhovConfig.layer` — env / `-Dchekhov.*` defaults; artifacts under `target/chekhov`
+
+Debugging: `chekhovBrowserKeepOpen := true` (or `-Dchekhov.keepOpen=true` /
+`CHEKHOV_KEEP_OPEN=true`) skips close and parks until Enter; default false. Headed +
+keep-open is the debug combo for stepping through a flaky suite.
 
 ## JSEnv
 
