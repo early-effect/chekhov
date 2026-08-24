@@ -64,7 +64,7 @@ Chromium / Firefox / WebKit. A leftover `npx` CLI or a different Playwright on
 
 `ChekhovSuite` wires config + driver + a fresh page per test. Override `chekhovConfig` when you
 need a different browser, `baseUrl`, or `artifactsDir`. Point `baseUrl` at a running app (or use
-scoped Vite / static serve; see **Serving the app**).
+StaticFileServer or AppServer.serve; see **Serving the app**).
 """
     ),
     section("How the stack fits")(

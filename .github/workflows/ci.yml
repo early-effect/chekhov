@@ -91,10 +91,6 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
-      - name: npm ci (vite fixture)
-        run: npm ci --prefix examples/vite-fixture
-      - name: npm ci (ascent fixture)
-        run: npm ci --prefix examples/ascent-fixture
       - name: Install Playwright browsers
         run: |
           set -euo pipefail
@@ -153,10 +149,6 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
-      - name: npm ci (vite fixture)
-        run: npm ci --prefix examples/vite-fixture
-      - name: npm ci (ascent fixture)
-        run: npm ci --prefix examples/ascent-fixture
       - name: Install Playwright browsers
         run: |
           set -euo pipefail

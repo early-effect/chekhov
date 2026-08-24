@@ -26,6 +26,7 @@ object MyVersions extends ZipxVersions:
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
   val dynverCi       = Plugin("rocks.earlyeffect", "sbt-dynver-ci", "0.2.3")
   val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.14.1")
+  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.1.0")
 
   def zioCore     = library(zio, zioStreams)
   def zioProtocol = library(zio, zioStreams, zioJson)

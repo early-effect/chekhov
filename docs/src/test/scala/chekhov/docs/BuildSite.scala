@@ -29,7 +29,7 @@ object BuildSite extends DocsSite:
       summaryMarkdown = Some(
         """**chekhov** is a ZIO-first Playwright client and Scala.js browser test toolkit.
 Protocol YAML becomes a typed Scala AST; a Node driver speaks the channel; suites compose
-browser, context, and page as layers (plus optional Vite/static serve).
+browser, context, and page as layers (static serve, plus optional scoped process serve).
 
 This is a **multi-module toolkit**: pick the artifacts you need (`chekhov-core`,
 `chekhov-driver`, `chekhov-zio-test`, `chekhov-dom`, `chekhov-ascent`, `chekhov-jsenv`,

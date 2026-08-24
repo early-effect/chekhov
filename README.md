@@ -169,7 +169,7 @@ Default `artifactsDir` is `target/chekhov` (override with `-Dchekhov.artifactsDi
 | `failures/` | PNGs from `ChekhovSuite.screenshotOnFailure` |
 | `traces/` | Playwright trace zips when `traceCapture` is `Always` or kept `OnFailure` |
 | `videos/` | Recorded videos when `videoCapture` is `Always` or kept `OnFailure` |
-| `serve/` | Scoped Vite/static serve logs |
+| `serve/` | Scoped serve logs |
 
 ```scala
 ChekhovConfig(
@@ -183,8 +183,6 @@ Local browsers / E2E **in this repo**:
 
 ```bash
 npm ci
-npm ci --prefix examples/vite-fixture
-npm ci --prefix examples/ascent-fixture
 ./scripts/install-browsers.sh   # or: npm run playwright:install / sbt pwInstall
 sbt testFull
 ```
@@ -305,7 +303,7 @@ Services are traits with `ZLayer` companions:
 - `ChannelTransport.layer` — scoped Node `run-driver` pipe
 - `ChannelConnection.layer` — initialize + request/response
 - `PlaywrightDriver.withBrowserType` / `browserLayer` / `pageLayer`
-- `AppServer.viteLayer(dir)` / `StaticFileServer.layer(dir)` — scoped serve + readiness
+- `AppServer.layer(config)` / `StaticFileServer.layer(dir)` — scoped serve + readiness
 - `ChekhovConfig.layer` — env / `-Dchekhov.*` defaults; artifacts under `target/chekhov`
 
 ## JSEnv
