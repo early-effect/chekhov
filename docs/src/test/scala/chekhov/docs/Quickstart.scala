@@ -62,9 +62,10 @@ module. Keep browser suites in their own sbt project if `core/test` must stay ch
 Chromium / Firefox / WebKit. A leftover `npx` CLI or a different Playwright on
 `NODE_PATH` is a hard error, not a silent driver.
 
-`ChekhovSuite` wires config + driver + a fresh page per test. Override `chekhovConfig` when you
-need a different browser, `baseUrl`, or `artifactsDir`. Point `baseUrl` at a running app (or use
-StaticFileServer or AppServer.serve; see **Serving the app**).
+`ChekhovSuite` wires config + driver + a fresh page per test (fresh context + page; the browser
+process is shared across the spec, so concurrent tests never share a page). Override
+`chekhovConfig` when you need a different browser, `baseUrl`, or `artifactsDir`. Point `baseUrl`
+at a running app (or use StaticFileServer or AppServer.serve; see **Serving the app**).
 """
     ),
     section("How the stack fits")(

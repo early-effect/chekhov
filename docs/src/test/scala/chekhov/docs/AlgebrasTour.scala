@@ -38,12 +38,20 @@ need a channel method that is not claimed yet.
 | Layer | Role |
 |-------|------|
 | `ChekhovConfig.layer` | browser, headless, `baseUrl`, `artifactsDir` |
-| `PlaywrightDriver.suiteLayers` | transport + browser type + shared browser + context + page |
+| `PlaywrightDriver.processLayers` | transport + shared Node run-driver + one browser per spec / browser fan-out |
+| `PlaywrightDriver.pageLayers` | fresh `BrowserContext` + `Page` per test |
+| `PlaywrightDriver.suiteLayers` | one-shot composition of process + page layers |
 | `StaticFileServer.layer` / `AppServer.layer` | scoped serve |
 | `ChekhovSuite.fullStack` | config service ++ driver suite layers |
 
-Override `chekhovLayerFor` on the suite when you need serve + stack together
-(it is applied once per `chekhovBrowsers` entry).
+`ChekhovSuite` runs on the split: the browser process is shared across the spec
+(`processLayers`, provided with `provideSomeLayerShared`) while every test gets a fresh
+context + page from `pageLayers`. Concurrent tests in one suite therefore each get their
+own page.
+
+Override `chekhovLayerFor` when you need serve + stack together: add
+`StaticFileServer.layer` / `AppServer.layer` on the **shared process** so serve is not
+restarted per test (it is applied once per `chekhovBrowsers` entry).
 """
     ),
     section("Screenshots on failure")(

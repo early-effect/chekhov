@@ -18,6 +18,7 @@ import scala.util.control.NonFatal
 private[jsenv] final class BrowserRunner(
     browser: ChekhovBrowser,
     headless: Boolean,
+    keepOpen: Boolean,
     onMessage: Option[String => Unit],
     runConfig: RunConfig,
 ):
@@ -59,7 +60,7 @@ private[jsenv] final class BrowserRunner(
 
   private def runBlocking(inputs: Seq[Input]): Unit =
     val materialized = HtmlMaterializer.materialize(inputs)
-    val config       = ChekhovConfig(browser = browser, headless = headless)
+    val config       = ChekhovConfig(browser = browser, headless = headless, keepOpen = keepOpen)
 
     val outPipe = new PipedOutputStream()
     val errPipe = new PipedOutputStream()
@@ -83,6 +84,7 @@ private[jsenv] final class BrowserRunner(
             page   <- ZIO.service[Page]
             _      <- page.goto(server.baseUrl + "/")
             _      <- pollLoop(page, outPs, errPs)
+            _      <- ZIO.when(keepOpen)(park)
           yield ()
         }
         .provide(
@@ -155,6 +157,14 @@ private[jsenv] final class BrowserRunner(
 
     loop
   end pollLoop
+
+  private def park: UIO[Unit] =
+    ZIO
+      .attemptBlocking {
+        java.lang.System.err.println("chekhov: browser kept open; press Enter to exit")
+        val _ = scala.io.StdIn.readLine()
+      }
+      .orElseSucceed(())
 
   private final case class LogLine(level: String, line: String) derives JsonDecoder
   private final case class FetchPayload(

@@ -89,6 +89,8 @@ final case class ChekhovConfig(
     executablePath: Option[String] = None,
     channel: Option[String] = None,
     launchArgs: List[String] = Nil,
+    // When true, skip close after the suite and park until Enter. Default false.
+    keepOpen: Boolean = false,
 )
 
 object ChekhovConfig:
@@ -135,6 +137,12 @@ object ChekhovConfig:
         .orElse(env.get("CHEKHOV_LAUNCH_ARGS"))
         .map(parseLaunchArgs)
         .getOrElse(Nil),
+      keepOpen = props
+        .get("chekhov.keepOpen")
+        .orElse(env.get("CHEKHOV_KEEP_OPEN"))
+        .filter(_.nonEmpty)
+        .map(_.toBoolean)
+        .getOrElse(false),
     )
 
   /** Comma / whitespace separated process args; `--flag=value` when an argument takes a value. */

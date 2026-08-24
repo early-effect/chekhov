@@ -7,18 +7,18 @@ import zio.test.*
 
 import java.nio.file.{Files, Path}
 
-/** Specular/saferis-shaped suite: scoped Playwright driver + page, artifacts under target/chekhov. */
+/** Specular/saferis-shaped suite: shared browser process, fresh context + page per test. */
 trait ChekhovSuite extends ZIOSpecDefault:
 
   /** Override to customize config (browser, baseUrl, artifactsDir, trace/video capture). */
   def chekhovConfig: ChekhovConfig = ChekhovConfig()
 
-  /** Stack for one config (override to add static serve or `AppServer.layer`). Fanned out per `chekhovBrowsers`. */
-  def chekhovLayerFor(cfg: ChekhovConfig): ZLayer[Any, ChekhovError, ChekhovSuite.Env] =
-    ZLayer.succeed(cfg) >>> ChekhovSuite.fullStack
+  /** Shared process stack for one config (override to add static serve or `AppServer.layer`). */
+  def chekhovLayerFor(cfg: ChekhovConfig): ZLayer[Any, ChekhovError, ChekhovSuite.ProcessEnv] =
+    ZLayer.succeed(cfg) >>> ChekhovSuite.processStack
 
   /** Layers for [[chekhovConfig]] (first / only browser if you provide this yourself). */
-  def chekhovLayer: ZLayer[Any, ChekhovError, ChekhovSuite.Env] =
+  def chekhovLayer: ZLayer[Any, ChekhovError, ChekhovSuite.ProcessEnv] =
     chekhovLayerFor(chekhovConfig)
 
   override def aspects =
@@ -26,16 +26,24 @@ trait ChekhovSuite extends ZIOSpecDefault:
       TestAspect.samples(1),
       TestAspect.withLiveClock,
       TestAspect.timeout(60.seconds),
+      KeepOpen.aspect,
       ChekhovSuite.onBrowsers(chekhovConfig, chekhovLayerFor),
     )
 end ChekhovSuite
 
 object ChekhovSuite:
 
-  type Env = ChekhovConfig & ArtifactSession & BrowserType & Browser & BrowserContext & Page
+  type ProcessEnv = ChekhovConfig & ArtifactSession & BrowserType & Browser
+  type Env        = ProcessEnv & BrowserContext & Page
+
+  val processStack: ZLayer[ChekhovConfig, ChekhovError, ProcessEnv] =
+    ZLayer.service[ChekhovConfig] ++ PlaywrightDriver.processLayers
+
+  val pageStack: ZLayer[ProcessEnv, ChekhovError, BrowserContext & Page] =
+    PlaywrightDriver.pageLayers
 
   val fullStack: ZLayer[ChekhovConfig, ChekhovError, Env] =
-    ZLayer.service[ChekhovConfig] ++ PlaywrightDriver.suiteLayers
+    processStack >+> pageStack
 
   /** Run `make` once per browser. Empty `browsers` uses `-Dchekhov.browsers` / `chekhovBrowsers`. */
   def forBrowsers[R, E](
@@ -46,10 +54,10 @@ object ChekhovSuite:
       list.map(b => suite(b.channelName)(make(b)))*
     )
 
-  /** One copy of the spec per configured browser, each with its own driver stack. */
+  /** One copy of the spec per configured browser: shared process, fresh page per test. */
   def onBrowsers(
       base: ChekhovConfig,
-      layerFor: ChekhovConfig => ZLayer[Any, ChekhovError, Env] = cfg => ZLayer.succeed(cfg) >>> fullStack,
+      layerFor: ChekhovConfig => ZLayer[Any, ChekhovError, ProcessEnv] = cfg => ZLayer.succeed(cfg) >>> processStack,
       browsers: List[ChekhovBrowser] = ChekhovBrowser.listed(),
   ): TestAspect[Nothing, Any, Nothing, Any] =
     new TestAspect[Nothing, Any, Nothing, Any]:
@@ -57,11 +65,17 @@ object ChekhovSuite:
         val run   = if browsers.isEmpty then List(base.browser) else browsers
         val parts = run.map { b =>
           val cfg   = base.copy(browser = b)
-          val inner = spec.provideSomeLayer[R](layerFor(cfg)).asInstanceOf[Spec[R, E]]
+          val inner =
+            spec
+              .asInstanceOf[Spec[ProcessEnv & BrowserContext & Page, E]]
+              .provideSomeLayer[ProcessEnv](pageStack)
+              .provideSomeLayerShared[Any](layerFor(cfg))
+              .asInstanceOf[Spec[R, E]]
           if run.tail.isEmpty then inner else suite(b.channelName)(inner)
         }
         if parts.tail.isEmpty then parts.head
         else suite("chekhov")(parts*)
+      end some
 
   def ensureArtifactsDir(dir: Path): UIO[Path] =
     ZIO.attempt(Files.createDirectories(dir)).orDie.as(dir)

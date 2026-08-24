@@ -60,6 +60,30 @@ testid / role / CSS; `waitFor` polls until the node appears. Depend on
 `org.scala-js:::scalajs-dom` only (not ascent’s DOM facade).
 """
     ),
+    section("Isolation: one page per module")(
+      md"""
+`ChekhovJSEnv` hosts the whole module's compiled test bundle in **one Playwright page**,
+shared by every spec and test in the module (ZIO Test runs them concurrently).
+
+- `withRoot` installs each scope inside its own **iframe**, so scoped DOM work is isolated
+  from sibling scopes. Pass the scoped root to locators (`getByTestId("inc", root)`), not
+  the whole document.
+- The **parent document is still shared**: whole-document assertions (element counts, global
+  state) can observe a sibling test mid-flight and flake. Assert on your own element: capture
+  the root inside the scope and check it after exit.
+
+```scala
+test("count starts at zero") {
+  withRoot { root =>
+    for
+      _ <- ZIO.succeed(mount(ui))
+      t <- getByTestId("count", root).innerText
+    yield assertTrue(t == "0")
+  }
+}
+```
+"""
+    ),
     section("chekhov-ascent")(
       md"""
 Ascent UI under JSEnv lives in **`chekhov-ascent`** (`ChekhovAscent.withMounted`), not

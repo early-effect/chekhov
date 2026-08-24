@@ -17,9 +17,10 @@ object ChekhovPlugin extends AutoPlugin:
     val chekhovBrowsers = settingKey[Seq[ChekhovBrowser]](
       "Browsers to install and run ChekhovSuite against (one suite copy each)"
     )
-    val chekhovHeadless     = settingKey[Boolean]("Run Playwright headless")
-    val chekhovArtifactsDir = settingKey[File]("Directory for Chekhov screenshots/traces/serve logs")
-    val chekhovInstall      = taskKey[Unit](
+    val chekhovHeadless        = settingKey[Boolean]("Run Playwright headless")
+    val chekhovBrowserKeepOpen = settingKey[Boolean]("Keep the headed browser open after tests; press Enter to exit")
+    val chekhovArtifactsDir    = settingKey[File]("Directory for Chekhov screenshots/traces/serve logs")
+    val chekhovInstall         = taskKey[Unit](
       s"Install the pinned Playwright ${PinnedPlaywright.version} CLI and chekhovBrowsers binaries"
     )
 
@@ -30,13 +31,14 @@ object ChekhovPlugin extends AutoPlugin:
   import autoImport.*
 
   override def projectSettings: Seq[Setting[?]] = Seq(
-    chekhovBrowser      := "chromium",
-    chekhovBrowsers     := ChekhovBrowser.fromString(chekhovBrowser.value).toSeq,
-    chekhovHeadless     := true,
-    chekhovArtifactsDir := (Test / target).value / "chekhov",
-    chekhovJSEnv        := {
+    chekhovBrowser         := "chromium",
+    chekhovBrowsers        := ChekhovBrowser.fromString(chekhovBrowser.value).toSeq,
+    chekhovHeadless        := true,
+    chekhovBrowserKeepOpen := false,
+    chekhovArtifactsDir    := (Test / target).value / "chekhov",
+    chekhovJSEnv           := Def.uncached {
       val browser = chekhovBrowsers.value.headOption.getOrElse(ChekhovBrowser.Chromium)
-      ChekhovJSEnv(browser = browser, headless = chekhovHeadless.value)
+      ChekhovJSEnv(browser = browser, headless = chekhovHeadless.value, keepOpen = chekhovBrowserKeepOpen.value)
     },
     Test / javaOptions ++= Def.uncached {
       val browsers = chekhovBrowsers.value
@@ -45,6 +47,7 @@ object ChekhovPlugin extends AutoPlugin:
         s"-Dchekhov.browser=${primary.channelName}",
         s"-Dchekhov.browsers=${browsers.map(_.channelName).mkString(",")}",
         s"-Dchekhov.headless=${chekhovHeadless.value}",
+        s"-Dchekhov.keepOpen=${chekhovBrowserKeepOpen.value}",
         s"-Dchekhov.artifactsDir=${chekhovArtifactsDir.value.getAbsolutePath}",
       )
     },

@@ -38,7 +38,7 @@ object StaticSpec extends ChekhovSuite:
 
   override def chekhovLayerFor(cfg: ChekhovConfig) =
     ZLayer.succeed(cfg) >>>
-      (StaticFileServer.layer(Path.of("examples/static-fixture")) ++ ChekhovSuite.fullStack)
+      (StaticFileServer.layer(Path.of("examples/static-fixture")) ++ ChekhovSuite.processStack)
 ```
 """
     ),
