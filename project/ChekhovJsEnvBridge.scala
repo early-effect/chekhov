@@ -33,7 +33,10 @@ final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
       )
     val urls   = readClasspath(classpathFile.toPath)
     val parent = classOf[JSEnv].getClassLoader
-    val cl     = new URLClassLoader(urls.toArray, parent)
+    // Child-first: sbt plugins (sbt-specular / specular-site) still put zio-json 0.10 on the parent
+    // loader. jsenv is compiled against 1.1.0; parent-first then NCDFE Magnolia / JsonEncoderDerivation
+    // and the Scala.js adapter only sees RunTerminatedException.
+    val cl     = new ChildFirstURLClassLoader(urls.toArray, parent)
     try
       val module = Class.forName("chekhov.jsenv.ChekhovJSEnv$", true, cl).getField("MODULE$").get(null)
       module.getClass.getMethod("create").invoke(module).asInstanceOf[JSEnv]
@@ -52,6 +55,30 @@ final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
         .filter(_.nonEmpty)
         .map(p => Path.of(p).toUri.toURL)
 end ChekhovJsEnvBridge
+
+/** Prefer this loader's jars, except for the JSEnv API sbt already loaded. */
+private final class ChildFirstURLClassLoader(urls: Array[URL], parent: ClassLoader)
+    extends URLClassLoader(urls, parent):
+  override def loadClass(name: String, resolve: Boolean): Class[?] =
+    if ChildFirstURLClassLoader.parentFirst(name) then super.loadClass(name, resolve)
+    else
+      val loaded = findLoadedClass(name)
+      val cls    =
+        if loaded != null then loaded
+        else
+          try findClass(name)
+          catch case _: ClassNotFoundException => super.loadClass(name, false)
+      if resolve then resolveClass(cls)
+      cls
+end ChildFirstURLClassLoader
+
+private object ChildFirstURLClassLoader:
+  private val ParentFirst =
+    List("java.", "javax.", "jdk.", "sun.", "scala.", "org.scalajs.jsenv.")
+
+  def parentFirst(name: String): Boolean =
+    ParentFirst.exists(name.startsWith)
+end ChildFirstURLClassLoader
 
 object ChekhovJsEnvBridge:
   /** Failed run when E2E is disabled (keeps `sbt test` green without browsers). */

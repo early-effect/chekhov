@@ -8,6 +8,8 @@ import zipx.shell.Exec
 
 MyVersions.settings
 
+ThisBuild / scalaVersion := (MyVersions.scala: String)
+
 organization         := "rocks.earlyeffect"
 organizationName     := "Early Effect"
 organizationHomepage := Some(uri("https://www.earlyeffect.rocks"))
@@ -41,6 +43,10 @@ publishMavenStyle    := true
 pomIncludeRepository := { _ => false }
 
 usePgpKeyHex(sys.env.getOrElse("PGP_KEY_HEX", "MISSING_KEY_HEX"))
+
+// specular-site still pins zio-json 0.9/0.10. Under early-semver a 0.x -> 1.x bump is breaking, so
+// sbt 2's eviction check fails without a scheme. Take 1.1.0 (native Scala 3 macros, no Magnolia).
+libraryDependencySchemes += "dev.zio" %% "zio-json" % "always"
 
 // The Playwright install, as a shell AST rather than a stripMargin block: quoting, globbing and
 // command substitution are the model's business, so an unquoted "${apt_mirror}"/*.deb or a stray
@@ -413,7 +419,7 @@ lazy val docs = (project in file("docs"))
     publish / skip := true,
     scalacOptions ++= commonScalacOptions,
     MyVersions.docsTest,
-    // Pin docs to the catalog zio-json in case specular-site's transitive pin drifts from it.
+    // Pin docs to catalog zio-json 1.1.0 if specular-site's transitive pin drifts.
     dependencyOverrides += MyVersions.moduleID(MyVersions.zioJson),
     zioTestSettings,
     specularBuildMain     := "chekhov.docs.BuildSite",

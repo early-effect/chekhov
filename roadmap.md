@@ -6,7 +6,7 @@ Chekhov is an Early Effect **ZIO-first Playwright client**: pinned `protocol.yml
 
 **Not** a wrap of `com.microsoft.playwright`. **Not** a reimplementation of the Playwright server. Sibling niche to [DanHodges/scalajs-playwright](https://github.com/DanHodges/scalajs-playwright), but JVM/ZIO + official Node driver protocol.
 
-Stack target: Scala **3.8.4**, ZIO **2.1.x**, sbt **2.x**, Scala.js **1.22**, Playwright driver pinned (currently **1.62.1**).
+Stack target: Scala **3.9.0**, ZIO **2.1.x**, sbt **2.x**, Scala.js **1.22**, Playwright driver pinned (currently **1.62.1**).
 
 ---
 
