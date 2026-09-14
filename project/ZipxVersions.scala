@@ -18,14 +18,14 @@ object MyVersions extends ZipxVersions:
   val scalajsJsEnvs = Lib("org.scala-js", "scalajs-js-envs", "1.6.0")
   val ascentJs      = Lib("rocks.earlyeffect", "ascent-js", "0.7.0")
 
-  val specular        = Lib("rocks.earlyeffect", "specular-core", "0.16.0")
+  val specular        = Lib("rocks.earlyeffect", "specular-core", "0.16.1")
   val specularZioTest = specular.mod("specular-zio-test").test
   val specularTheme   = specular.mod("early-effect-docs-theme").test
 
   val scalajs        = Plugin("org.scala-js", "sbt-scalajs", "1.22.0")
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
   val dynverCi       = Plugin("rocks.earlyeffect", "sbt-dynver-ci", "0.2.3")
-  val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.16.0")
+  val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.16.1")
   val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.1.0")
 
   def zioCore     = library(zio, zioStreams)
