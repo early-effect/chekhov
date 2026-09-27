@@ -76,7 +76,7 @@ jobs:
           cache-key-suffix: cache-rehydrate
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: save
           cache-epoch: ""
       - name: Cache Playwright apt packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -112,7 +112,7 @@ jobs:
           echo "Playwright $(node -p "require('playwright/package.json').version") browsers ready"
 
       - name: cache-rehydrate
-        run: sbt 'compile'
+        run: sbt 'Test/compile'
   test:
     name: test
     runs-on: ubuntu-latest
@@ -134,7 +134,7 @@ jobs:
           cache-key-suffix: test
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: restore
           cache-epoch: ""
       - name: Cache Playwright apt packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -199,7 +199,7 @@ jobs:
           cache-key-suffix: fmt
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: restore
           cache-epoch: ""
       - name: fmt
         run: |
@@ -231,7 +231,7 @@ jobs:
           cache-key-suffix: workflow-check
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: restore
           cache-epoch: ""
       - name: workflow-check
         run: |
@@ -263,7 +263,7 @@ jobs:
           cache-key-suffix: advisories
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: restore
           cache-epoch: ""
       - name: advisories
         run: |
@@ -297,7 +297,7 @@ jobs:
           cache-key-suffix: publish
           node-version: ""
           sbt-disk-cache: "false"
-          local-cache: "true"
+          cache-mode: restore
           cache-epoch: ""
       - name: Import signing key
         run: |
