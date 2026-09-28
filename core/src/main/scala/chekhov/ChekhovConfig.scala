@@ -91,6 +91,9 @@ final case class ChekhovConfig(
     launchArgs: List[String] = Nil,
     // When true, skip close after the suite and park until Enter. Default false.
     keepOpen: Boolean = false,
+    // Extra environment for the launched browser, on top of the one Chekhov runs in; it wins over what Chekhov adds
+    // itself (Firefox on macOS gets its own TMPDIR and MOZ_APP_DATA, since it cannot start without them).
+    browserEnv: Map[String, String] = Map.empty,
 )
 
 object ChekhovConfig:

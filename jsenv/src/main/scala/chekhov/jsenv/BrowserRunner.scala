@@ -19,6 +19,7 @@ private[jsenv] final class BrowserRunner(
     browser: ChekhovBrowser,
     headless: Boolean,
     keepOpen: Boolean,
+    browserEnv: Map[String, String],
     onMessage: Option[String => Unit],
     runConfig: RunConfig,
 ):
@@ -60,7 +61,8 @@ private[jsenv] final class BrowserRunner(
 
   private def runBlocking(inputs: Seq[Input]): Unit =
     val materialized = HtmlMaterializer.materialize(inputs)
-    val config       = ChekhovConfig(browser = browser, headless = headless, keepOpen = keepOpen)
+    val config       =
+      ChekhovConfig(browser = browser, headless = headless, keepOpen = keepOpen, browserEnv = browserEnv)
 
     val outPipe = new PipedOutputStream()
     val errPipe = new PipedOutputStream()

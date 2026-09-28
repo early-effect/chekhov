@@ -34,6 +34,15 @@ Prefer `ModuleKind.ESModule` (or otherwise materializable scripts) for linked te
 `ChekhovJSEnv` materializes `Input.Script` / `Input.ESModule` onto a localhost page and bridges
 `scalajsCom` via frame `evaluateExpression`.
 
+Firefox on macOS 27 cannot start without its own temp and app-data directories (Mozilla 2060476), so
+Chekhov gives it `TMPDIR=/tmp` and a `MOZ_APP_DATA` under `artifactsDir` itself. A JSEnv runs inside sbt,
+where a build's `Test / envVars` never reaches the browser, so anything else the browser needs goes in
+`browserEnv`, on top of sbt's own environment:
+
+```scala
+Test / jsEnv := ChekhovJSEnv(ChekhovBrowser.Firefox, browserEnv = Map("MOZ_LOG" -> "nsHttp:3"))
+```
+
 **This monorepo** still uses an internal classpath bridge for `jsenv-smoke` / `dom` so CI need
 not publish first. Consumers should not copy that bridge.
 """
