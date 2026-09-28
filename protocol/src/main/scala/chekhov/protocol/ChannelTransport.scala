@@ -115,15 +115,7 @@ object ChannelTransport:
             (process, in, out)
           }
           .mapError(e => ChekhovError.Driver("Failed to spawn Playwright driver", Some(e)))
-      } { case (p, _, _) =>
-        // Kill only. Do not close pipes: close can block uninterruptibly on a wedged child,
-        // and Scope finalizers are uninterruptible. Destroy EOFs the daemon reader.
-        ZIO.attemptBlocking {
-          p.destroyForcibly()
-          p.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)
-          ()
-        }.ignore
-      }
+      } { case (p, _, _) => ZIO.attemptBlocking(stop(p)).ignore }
       (process, in, out) = acquired
       waiters     <- Ref.make(Map.empty[Int, Promise[ChekhovError, ServerResponse]])
       eventHub    <- ZIO.acquireRelease(Hub.unbounded[ServerEvent])(_.shutdown)
@@ -143,6 +135,22 @@ object ChannelTransport:
 
   val layer: ZLayer[Any, ChekhovError, ChannelTransport] =
     ZLayer.scoped(live)
+
+  /** Ends the driver and every process it started. A browser whose launch never answered has no `Browser` to close, so
+    * only this is left to end it; and once the driver is gone its browsers belong to init, where nothing finds them. So
+    * the descendants are taken first, the driver gets a SIGTERM (Playwright then closes its own browsers), and after a
+    * bounded wait anything still alive is killed.
+    *
+    * Kill only. Do not close pipes: close can block uninterruptibly on a wedged child, and Scope finalizers are
+    * uninterruptible, which is also why the wait is bounded. Ending the driver EOFs the daemon reader.
+    */
+  private def stop(driver: Process): Unit =
+    val started = driver.descendants().iterator().asScala.toList
+    driver.destroy()
+    driver.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+    (driver.toHandle :: started).filter(_.isAlive).foreach(_.destroyForcibly())
+    driver.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)
+    ()
 
   private final case class DriverPaths(node: String, cli: String)
 
