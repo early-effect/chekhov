@@ -14,8 +14,28 @@ object PlaywrightDriver:
   def usesSystemBrowser(config: ChekhovConfig): Boolean =
     config.executablePath.isDefined || config.channel.isDefined
 
-  /** `browserType.launch` params from config; `ci` disables the Chromium sandbox. */
-  def launchParams(config: ChekhovConfig, ci: Boolean): Commands.BrowserTypeLaunch =
+  /** Whether Chekhov runs on macOS, where Firefox needs [[firefoxOnMac]] to start. */
+  def onMac: Boolean = sys.props.get("os.name").exists(_.startsWith("Mac"))
+
+  /** macOS 27 tags `~/Library/Application Support/Firefox` with `com.apple.macl`, and Playwright's Firefox then cannot
+    * start (Mozilla 2060476). Its own temp and app-data directories, under `artifactsDir`, let it.
+    */
+  def firefoxOnMac(config: ChekhovConfig): Map[String, String] =
+    Map("TMPDIR" -> "/tmp", "MOZ_APP_DATA" -> config.artifactsDir.resolve("firefox-app-data").toAbsolutePath.toString)
+
+  /** `browserType.launch` params from config; `ci` disables the Chromium sandbox, and `inherited` is the environment
+    * Chekhov runs in. Playwright's `env` replaces the browser's whole environment, so what the browser needs (Firefox
+    * on macOS's two variables, then `browserEnv`, which wins) is sent on top of `inherited`, and no `env` at all when
+    * there is nothing to add.
+    */
+  def launchParams(
+      config: ChekhovConfig,
+      ci: Boolean,
+      inherited: Map[String, String] = sys.env,
+      mac: Boolean = onMac,
+  ): Commands.BrowserTypeLaunch =
+    val needed =
+      (if mac && config.browser == ChekhovBrowser.Firefox then firefoxOnMac(config) else Map.empty) ++ config.browserEnv
     Commands.BrowserTypeLaunch(
       headless = Some(config.headless),
       chromiumSandbox = if ci then Some(false) else None,
@@ -24,7 +44,13 @@ object PlaywrightDriver:
       args =
         if config.launchArgs.nonEmpty then Some(Json.Arr(config.launchArgs.map(Json.Str(_))*))
         else None,
+      env = Option.when(needed.nonEmpty)(nameValues(inherited ++ needed)),
     )
+  end launchParams
+
+  /** Playwright's `NameValue[]`, sorted so the request is the same for the same environment. */
+  private def nameValues(env: Map[String, String]): Json =
+    Json.Arr(env.toList.sortBy(_._1).map((n, v) => Json.Obj("name" -> Json.Str(n), "value" -> Json.Str(v)))*)
 
   final case class BrowserTypeService(
       conn: ChannelConnection,

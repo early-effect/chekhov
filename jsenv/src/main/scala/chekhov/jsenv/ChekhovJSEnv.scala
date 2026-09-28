@@ -6,17 +6,21 @@ import org.scalajs.jsenv.*
 import scala.concurrent.Future
 
 /** Playwright channel-backed JSEnv: scripts run in a real browser page over localhost. */
+/** `browserEnv` is extra environment for the browser, on top of the sbt JVM's. A JSEnv runs inside sbt, where a build's
+  * `Test / envVars` does not reach, so a browser that needs a variable to start takes it here.
+  */
 final class ChekhovJSEnv(
     browser: ChekhovBrowser = ChekhovBrowser.Chromium,
     headless: Boolean = true,
     keepOpen: Boolean = false,
+    browserEnv: Map[String, String] = Map.empty,
 ) extends JSEnv:
 
   val name: String = s"ChekhovJSEnv(${browser.channelName}, headless=$headless, keepOpen=$keepOpen)"
 
   def start(input: Seq[Input], runConfig: RunConfig): JSRun =
     validate(runConfig)
-    val runner = new BrowserRunner(browser, headless, keepOpen, onMessage = None, runConfig)
+    val runner = new BrowserRunner(browser, headless, keepOpen, browserEnv, onMessage = None, runConfig)
     runner.start(input)
     new JSRun:
       def future: Future[Unit] = runner.future
@@ -24,7 +28,7 @@ final class ChekhovJSEnv(
 
   def startWithCom(input: Seq[Input], runConfig: RunConfig, onMessage: String => Unit): JSComRun =
     validate(runConfig)
-    val runner = new BrowserRunner(browser, headless, keepOpen, onMessage = Some(onMessage), runConfig)
+    val runner = new BrowserRunner(browser, headless, keepOpen, browserEnv, onMessage = Some(onMessage), runConfig)
     runner.start(input)
     new JSComRun:
       def future: Future[Unit]    = runner.future
@@ -44,8 +48,9 @@ object ChekhovJSEnv:
       browser: ChekhovBrowser = ChekhovBrowser.Chromium,
       headless: Boolean = true,
       keepOpen: Boolean = false,
+      browserEnv: Map[String, String] = Map.empty,
   ): ChekhovJSEnv =
-    new ChekhovJSEnv(browser, headless, keepOpen)
+    new ChekhovJSEnv(browser, headless, keepOpen, browserEnv)
 
   /** No-arg factory for reflective / sbt `jsEnv` wiring (Chromium, headless). */
   def create(): JSEnv = apply()
