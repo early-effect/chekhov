@@ -69,12 +69,18 @@ object ScopeCleanupSpec extends ZIOSpecDefault:
       end for
     }
 
-  /** A launch that never answers (Firefox on macOS 27 without its environment) fails the scope before any `Browser`
-    * exists to close, so only the driver's release is left to end what it started.
+  /** Firefox's app data where macOS 27 guards it with `com.apple.macl`, so its launch never answers (Mozilla 2060476).
+    * Chekhov gives Firefox its own directory; `browserEnv` wins clashes, so this puts the guarded one back.
+    */
+  private val guardedAppData: Map[String, String] =
+    Map("MOZ_APP_DATA" -> s"${java.lang.System.getProperty("user.home")}/Library/Application Support/Firefox")
+
+  /** A launch that never answers fails the scope before any `Browser` exists to close, so only the driver's release is
+    * left to end what it started.
     */
   private val failedLaunch =
     test("a launch that never answers still ends the browser the driver started") {
-      val config = ChekhovConfig(browser = ChekhovBrowser.Firefox, headless = true)
+      val config = ChekhovConfig(browser = ChekhovBrowser.Firefox, headless = true, browserEnv = guardedAppData)
       for
         before <- descendants
         seen   <- Ref.make(Set.empty[ProcessHandle])
