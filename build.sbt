@@ -334,6 +334,7 @@ lazy val `zio-test` = (project in file("zio-test"))
     name := "chekhov-zio-test",
     scalacOptions ++= commonScalacOptions,
     MyVersions.zioTestLib,
+    zioTestSettings,
   )
 
 lazy val dom = (project in file("dom"))

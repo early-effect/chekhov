@@ -21,14 +21,7 @@ trait ChekhovSuite extends ZIOSpecDefault:
   def chekhovLayer: ZLayer[Any, ChekhovError, ChekhovSuite.ProcessEnv] =
     chekhovLayerFor(chekhovConfig)
 
-  override def aspects =
-    Chunk(
-      TestAspect.samples(1),
-      TestAspect.withLiveClock,
-      TestAspect.timeout(60.seconds),
-      KeepOpen.aspect,
-      ChekhovSuite.onBrowsers(chekhovConfig, chekhovLayerFor),
-    )
+  override def aspects = ChekhovSuite.aspectsAround(ChekhovSuite.onBrowsers(chekhovConfig, chekhovLayerFor))
 end ChekhovSuite
 
 object ChekhovSuite:
@@ -76,6 +69,21 @@ object ChekhovSuite:
         if parts.tail.isEmpty then parts.head
         else suite("chekhov")(parts*)
       end some
+
+  /** A ChekhovSuite's aspects, around `browsers`, the aspect that builds the stack its tests share. They fold in order,
+    * so each wraps the ones before it: `withLiveClock` comes last so the shared stack is built on the live clock, and
+    * the driver handshake's timeouts can fire.
+    */
+  private[ziotest] def aspectsAround[R, E](
+      browsers: TestAspect[Nothing, R, E, Any]
+  ): Chunk[TestAspect[Nothing, R, E, Any]] =
+    Chunk(
+      TestAspect.samples(1),
+      TestAspect.timeout(60.seconds),
+      KeepOpen.aspect,
+      browsers,
+      TestAspect.withLiveClock,
+    )
 
   def ensureArtifactsDir(dir: Path): UIO[Path] =
     ZIO.attempt(Files.createDirectories(dir)).orDie.as(dir)
