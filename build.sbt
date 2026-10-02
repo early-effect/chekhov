@@ -172,7 +172,9 @@ zipxEnv := Map(
   "PLAYWRIGHT_BROWSERS_PATH" -> EnvValue.typed(Expr.github("workspace") ++ Expr.lit("/target/ms-playwright")),
 )
 
-zipxCapabilities += ZipxCentral.release
+zipxCapabilities += ZipxCentral.snapshots
+zipxCapabilities += ZipxCentral.pullRequestSnapshots("snapshots")
+zipxReleaseWorkflow := Some(ZipxCentral.releases)
 zipxCapabilities += ZipxDocs.pages()
 
 addCommandAlias("release", "; publishSigned; sonaRelease")
