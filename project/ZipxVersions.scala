@@ -16,7 +16,7 @@ object MyVersions extends ZipxVersions:
   val zioTest    = zio.mod("zio-test")
   val zioTestSbt = zio.mod("zio-test-sbt")
 
-  val scalajsDom    = Lib("org.scala-js", "scalajs-dom", "2.8.0")
+  val scalajsDom    = Lib("org.scala-js", "scalajs-dom", "2.8.1")
   val scalajsJsEnvs = Lib("org.scala-js", "scalajs-js-envs", "1.6.0")
   val ascentJs      = Lib("rocks.earlyeffect", "ascent-js", "0.7.0")
 
@@ -27,7 +27,9 @@ object MyVersions extends ZipxVersions:
   val scalajs        = Plugin("org.scala-js", "sbt-scalajs", "1.22.0")
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
   val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.16.1")
-  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.1.0")
+  // A meta-build refuses two cross suffixes of coursier. This splice release publishes the other suffix, so the
+  // plugin dependency drops that organization and links against the jars sbt-zipx brings.
+  val sbtSplice = Plugin("rocks.earlyeffect", "sbt-splice", "0.1.0").excluding(ZipxExclude.org("io.get-coursier"))
 
   def zioCore     = library(zio, zioStreams)
   def zioProtocol = library(zio, zioStreams, zioJson)
