@@ -19,7 +19,7 @@ object MyVersions extends ZipxVersions:
 
   val scalajsDom    = Lib("org.scala-js", "scalajs-dom", "2.8.1")
   val scalajsJsEnvs = Lib("org.scala-js", "scalajs-js-envs", "1.6.0")
-  val ascentJs      = Lib("rocks.earlyeffect", "ascent-js", "0.7.0")
+  val ascentJs      = Lib("rocks.earlyeffect", "ascent-js", "0.11.0")
 
   val specular        = Lib("rocks.earlyeffect", "specular-core", "0.20.0")
   val specularZioTest = specular.mod("specular-zio-test").test
@@ -33,7 +33,7 @@ object MyVersions extends ZipxVersions:
   val scalajs        = Plugin("org.scala-js", "sbt-scalajs", "1.22.0")
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
   val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.20.0")
-  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.3.2-42d1f350d30e-SNAPSHOT")
+  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.3.2-c40266743ccf-SNAPSHOT")
 
   def zioCore     = library(zio, zioStreams)
   def zioProtocol = library(zio, zioStreams, zioJson)
