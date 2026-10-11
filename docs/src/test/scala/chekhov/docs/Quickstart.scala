@@ -23,12 +23,12 @@ Add the suite stack, install this Chekhov version's Playwright, then run the tes
 ```scala
 // build.sbt
 libraryDependencies ++= Seq(
-  "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
-  "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
+  "rocks.earlyeffect" %% "chekhov-zio-test" % "${DocsVersion.version}" % Test,
+  "rocks.earlyeffect" %% "chekhov-driver"   % "${DocsVersion.version}" % Test,
 )
 
 // project/plugins.sbt (optional, for chekhovInstall + JSEnv)
-addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "${DocsVersion.version}")
 ```
 
 ```bash

@@ -3,8 +3,9 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-earlyeffect.rocks-blue)](https://www.earlyeffect.rocks/chekhov/)
 
-**ZIO-first** Playwright client for Scala 3, plus a Scala.js DOM helper / JSEnv path for real-browser component tests.
-Named for *Chekhov's gun*: if the UI shows a control, a test should be able to fire it.
+A test that can see a control can fire it.
+
+[Docs](https://www.earlyeffect.rocks/chekhov/)
 
 > **Status: early / pre-1.0.** Published under [early-semver](https://www.scala-sbt.org/1.x/docs/Publishing.html#Version+scheme).
 > No `com.microsoft.playwright` JAR: Chekhov speaks Playwright's channel protocol from Scala/ZIO.
@@ -61,23 +62,23 @@ Suite stack (JVM):
 
 ```scala
 libraryDependencies ++= Seq(
-  "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
-  "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
+  "rocks.earlyeffect" %% "chekhov-zio-test" % "0.1.3" % Test,
+  "rocks.earlyeffect" %% "chekhov-driver"   % "0.1.3" % Test,
 )
 ```
 
 Scala.js DOM helpers and real-browser JSEnv:
 
 ```scala
-libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "<version>" % Test
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "0.1.3" % Test
 // project/plugins.sbt — pulls chekhov-jsenv onto the sbt classpath
-addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "0.1.3")
 ```
 
 Ascent component tests (pulls `chekhov-dom` transitively):
 
 ```scala
-libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "<version>" % Test
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "0.1.3" % Test
 ```
 
 ```scala

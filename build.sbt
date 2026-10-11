@@ -428,8 +428,13 @@ lazy val docs = (project in file("docs"))
     specularMetaProject   := Some(LocalProject("core")),
     specularArtifactKind  := "library",
     specularSiteDirectory := (ThisBuild / baseDirectory).value / "target" / "site",
-    // CI docs builds are dynver `-ci`; stripCi drops the suffix so install snippets show the last published tag.
-    specularDisplayVersion := stripCi,
+    // Do not strip -ci first. sbt-dynver-ci names a distance build 0.1.4-ci, and stripping
+    // that suffix yields 0.1.4, which is not the published coordinate. A raw version that
+    // contains -ci, +, or SNAPSHOT advertises the last Central tag.
+    specularDisplayVersion := { raw =>
+      val distance = raw.contains("-ci") || raw.contains("+") || raw.contains("SNAPSHOT")
+      if (raw.nonEmpty && !distance) raw else "0.1.3"
+    },
   )
 
 // Aggregate `testFull` still fans out across modules; run Playwright-heavy suites one at a time.

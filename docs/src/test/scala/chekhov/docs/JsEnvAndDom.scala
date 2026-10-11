@@ -19,12 +19,12 @@ Published consumers: add the plugin (it depends on `chekhov-jsenv`) and set `jsE
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "${DocsVersion.version}")
 
 // build.sbt
 import chekhov.sbt.ChekhovPlugin.autoImport.*
 
-libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "<version>" % Test
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-dom" % "${DocsVersion.version}" % Test
 Test / jsEnv := chekhovJSEnv.value
 // or: Test / jsEnv := ChekhovJSEnv()
 // or: Test / jsEnv := ChekhovJSEnv(ChekhovBrowser.Firefox)
@@ -99,7 +99,7 @@ Ascent UI under JSEnv lives in **`chekhov-ascent`** (`ChekhovAscent.withMounted`
 core. It mounts into a `chekhov-dom` root and tears down via ascent’s subscription bag:
 
 ```scala
-libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "<version>" % Test
+libraryDependencies += "rocks.earlyeffect" %%% "chekhov-ascent" % "${DocsVersion.version}" % Test
 
 import chekhov.ascent.ChekhovAscent.withMounted
 import chekhov.dom.*

@@ -8,7 +8,8 @@ object MyVersions extends ZipxVersions:
   val sbt: SbtVersion     = SbtVersion("2.1.0-M3")
   val scala: ScalaVersion = ScalaVersion("3.9.0")
 
-  val release = ShipGroup("chekhov", "0.1.4")("core", "protocol", "driver", "zio-test", "dom", "ascent", "jsenv", "sbt-chekhov")
+  val release =
+    ShipGroup("chekhov", "0.1.4")("core", "protocol", "driver", "zio-test", "dom", "ascent", "jsenv", "sbt-chekhov")
 
   val zio        = Lib("dev.zio", "zio", "2.1.26")
   val zioStreams = zio.mod("zio-streams")
@@ -20,13 +21,18 @@ object MyVersions extends ZipxVersions:
   val scalajsJsEnvs = Lib("org.scala-js", "scalajs-js-envs", "1.6.0")
   val ascentJs      = Lib("rocks.earlyeffect", "ascent-js", "0.7.0")
 
-  val specular        = Lib("rocks.earlyeffect", "specular-core", "0.16.1")
+  val specular        = Lib("rocks.earlyeffect", "specular-core", "0.20.0")
   val specularZioTest = specular.mod("specular-zio-test").test
+  val specularSite    = specular.mod("specular-site").test
   val specularTheme   = specular.mod("early-effect-docs-theme").test
+
+  // Docs only. Not in the ship group: published artifacts do not depend on mermoid.
+  // mermoid-ascent 0.2.0 needs ascent-js 0.11, and the fixtures stay on ascent-js 0.7.
+  val mermoid = Lib("rocks.earlyeffect", "mermoid", "0.2.0").test
 
   val scalajs        = Plugin("org.scala-js", "sbt-scalajs", "1.22.0")
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
-  val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.16.1")
+  val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.20.0")
   val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.3.2-42d1f350d30e-SNAPSHOT")
 
   def zioCore     = library(zio, zioStreams)
@@ -37,5 +43,5 @@ object MyVersions extends ZipxVersions:
   def domLib      = library(zio, scalajsDom)
   def ascentLib   = library(ascentJs, zio)
   def jsenvLib    = library(scalajsJsEnvs, zio, zioJson)
-  def docsTest    = library(specularZioTest, specularTheme)
+  def docsTest    = library(specularZioTest, specularSite, specularTheme, mermoid)
 end MyVersions
