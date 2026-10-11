@@ -28,8 +28,8 @@ lazy val e2e = (project in file("e2e"))
   .dependsOn(core)
   .settings(
     libraryDependencies ++= Seq(
-      "rocks.earlyeffect" %% "chekhov-zio-test" % "<version>" % Test,
-      "rocks.earlyeffect" %% "chekhov-driver"   % "<version>" % Test,
+      "rocks.earlyeffect" %% "chekhov-zio-test" % "${DocsVersion.version}" % Test,
+      "rocks.earlyeffect" %% "chekhov-driver"   % "${DocsVersion.version}" % Test,
     ),
   )
 ```
@@ -44,7 +44,7 @@ depend only on `core`.
 In a consuming repo (no `package.json` required):
 
 ```scala
-addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "<version>")
+addSbtPlugin("rocks.earlyeffect" % "sbt-chekhov" % "${DocsVersion.version}")
 ```
 
 ```bash

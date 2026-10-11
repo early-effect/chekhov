@@ -1,15 +1,19 @@
 package chekhov.docs
 
 import earlyeffect.docs.EarlyEffectTheme
+import specular.*
 import specular.site.*
 import zio.*
 
-import java.nio.file.Path
+import java.nio.file.{Files, Path, StandardCopyOption}
 
 /** Docs-as-tests site builder (Test classpath; `docs/specularSite`). */
 object BuildSite extends DocsSite:
 
-  def pages = Vector(
+  /** Not a nav item. The sidebar is the table of contents; this page is the front. */
+  private val frontPage: DocPage = Front.doc
+
+  private val guidePages: Vector[DocPage] = Vector(
     Quickstart.doc,
     BrowsersAndE2E.doc,
     ServingTheApp.doc,
@@ -18,68 +22,41 @@ object BuildSite extends DocsSite:
     Contributing.doc,
   )
 
-  // Meta comes from published `core` (`chekhov-core`); hub card / chrome use the toolkit name.
-  override def meta: ProjectMeta =
-    super.meta.copy(name = "chekhov", title = Some("chekhov"))
+  def pages: Vector[DocPage] = frontPage +: guidePages
 
-  override def site: SiteModel =
-    val m       = meta
-    val branded = EarlyEffectTheme.brand(super.site)
-    branded.copy(
-      summaryMarkdown = Some(
-        """**chekhov** is a ZIO-first Playwright client and Scala.js browser test toolkit.
-Protocol YAML becomes a typed Scala AST; a Node driver speaks the channel; suites compose
-browser, context, and page as layers (static serve, plus optional scoped process serve).
-
-This is a **multi-module toolkit**: pick the artifacts you need (`chekhov-core`,
-`chekhov-driver`, `chekhov-zio-test`, `chekhov-dom`, `chekhov-ascent`, `chekhov-jsenv`,
-`sbt-chekhov`).
-"""
-      ),
-      installSnippets = Vector(
-        CodeSnippet(
-          "Suite stack (JVM)",
-          s"""libraryDependencies ++= Seq(
-  "${m.organization}" %% "chekhov-zio-test" % "${m.version}" % Test,
-  "${m.organization}" %% "chekhov-driver"   % "${m.version}" % Test,
-)
-// project/plugins.sbt, then: sbt chekhovInstall
-addSbtPlugin("${m.organization}" % "sbt-chekhov" % "${m.version}")""",
+  override def site(settings: DocsSettings): SiteModel =
+    val meta = settings.meta.copy(name = "chekhov", title = Some("chekhov"))
+    EarlyEffectTheme
+      .brand(super.site(settings))
+      .copy(
+        title = meta.displayTitle,
+        meta = Some(meta),
+        nav = Some(NavModel.flat(guidePages)),
+        pages = pages,
+        summaryMarkdown = None,
+        installSnippets = Vector.empty,
+        brand = Some(
+          Brand(
+            name = "chekhov",
+            links = Vector(EarlyEffectTheme.github("https://github.com/early-effect/chekhov")),
+          )
         ),
-        CodeSnippet(
-          "Scala.js DOM + JSEnv",
-          s"""// project/plugins.sbt
-addSbtPlugin("${m.organization}" % "sbt-chekhov" % "${m.version}")
-
-// build.sbt
-libraryDependencies += "${m.organization}" %%% "chekhov-dom" % "${m.version}" % Test
-Test / jsEnv := chekhovJSEnv.value
-""",
-        ),
-        CodeSnippet(
-          "Ascent + JSEnv",
-          s"""libraryDependencies += "${m.organization}" %%% "chekhov-ascent" % "${m.version}" % Test
-Test / jsEnv := chekhovJSEnv.value
-""",
-        ),
-        CodeSnippet(
-          "Core algebras only",
-          s"""libraryDependencies += "${m.organization}" %% "chekhov-core" % "${m.version}"""",
-        ),
-      ),
-      brand = Some(
-        Brand(
-          name = m.title.getOrElse("chekhov"),
-          links = Vector(EarlyEffectTheme.github("https://github.com/early-effect/chekhov")),
-        )
-      ),
-    )
+      )
   end site
 
   override def layers: ZLayer[Any, Nothing, SiteBuilder] =
     EarlyEffectTheme.layers
 
-  override def afterBuild(out: Path, result: SiteOutput): Task[Unit] =
+  override def afterBuild(out: Path, result: SiteOutput): IO[SiteError, Unit] =
     val _ = result
-    EarlyEffectTheme.writeLogo(out)
+    // Specular always writes index.html as a summary plus a second copy of the nav.
+    // The front DocPage is the index. Copy it over that file. Asset paths stay site-relative.
+    val front   = out.resolve(s"${frontPage.slug}.html")
+    val index   = out.resolve("index.html")
+    val promote =
+      ZIO.attemptBlockingIO(Files.copy(front, index, StandardCopyOption.REPLACE_EXISTING)).mapError { err =>
+        SiteError.WriteFailed(index, err)
+      }
+    promote *> EarlyEffectTheme.writeLogo(out)
+  end afterBuild
 end BuildSite
