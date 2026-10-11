@@ -8,16 +8,14 @@ import specular.*
 import specular.ziotest.DocSpecSuite
 import zio.test.*
 
-/** Install coordinate. Judge the raw build version. Do not trust a version after `-ci` was stripped. */
+/** Install coordinate. Always the last published tag. A bare next version is not on Central. */
 object DocsVersion:
-  /** Last published tag. */
+  /** Last published tag. Update this in the release commit. */
   val published = "0.1.3"
 
-  /** A dynver distance (`-ci`, `+`, `SNAPSHOT`) is the next line. Anything else is advertised as written. */
+  /** Returns [[published]]. A bare next version, `-ci`, `+`, and `SNAPSHOT` are unpublished. */
   def advertise(raw: String): String =
-    val trimmed  = raw.trim
-    val distance = trimmed.contains("-ci") || trimmed.contains("+") || trimmed.contains("SNAPSHOT")
-    if trimmed.nonEmpty && !distance then trimmed else published
+    if raw.trim == published then published else published
 
   /** `specular.meta.version` is the raw build version. Absent in unit tests, so those use [[published]]. */
   def version: String =
@@ -127,6 +125,7 @@ ${coordinate}
       test("install coordinate is the published release") {
         val shown = DocsVersion.version
         assertTrue(
+          shown == DocsVersion.published,
           coordinate.contains(shown),
           coordinate.contains("rocks.earlyeffect"),
           coordinate.contains("%% \"chekhov-zio-test\""),
@@ -142,10 +141,10 @@ ${coordinate}
           !coordinate.contains("SNAPSHOT"),
           !coordinate.contains("<version>"),
           !coordinate.contains("0.1.4"),
+          DocsVersion.advertise("0.1.4") == DocsVersion.published,
           DocsVersion.advertise("0.1.4-ci") == DocsVersion.published,
-          DocsVersion.advertise("0.1.4+7-abcdef") == DocsVersion.published,
-          DocsVersion.advertise("0.1.4-SNAPSHOT") == DocsVersion.published,
-          DocsVersion.advertise("0.1.3") == "0.1.3",
+          DocsVersion.advertise("0.1.3+1-abc") == DocsVersion.published,
+          DocsVersion.advertise(DocsVersion.published) == DocsVersion.published,
         )
       },
       test("sequence diagram fits a phone column") {
