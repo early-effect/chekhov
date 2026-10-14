@@ -5,7 +5,7 @@ import zipx.*
   * is not a row: zipx already brings it in.
   */
 object MyVersions extends ZipxVersions:
-  val sbt: SbtVersion     = SbtVersion("2.1.0-M3")
+  val sbt: SbtVersion     = SbtVersion("2.1.0-RC1")
   val scala: ScalaVersion = ScalaVersion("3.9.0")
 
   val release =
@@ -33,7 +33,7 @@ object MyVersions extends ZipxVersions:
   val scalajs        = Plugin("org.scala-js", "sbt-scalajs", "1.22.0")
   val scalafmt       = Plugin("org.scalameta", "sbt-scalafmt", "2.6.2")
   val specularPlugin = Plugin("rocks.earlyeffect", "sbt-specular", "0.20.0")
-  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.3.2-42d1f350d30e-SNAPSHOT")
+  val sbtSplice      = Plugin("rocks.earlyeffect", "sbt-splice", "0.3.2")
 
   def zioCore     = library(zio, zioStreams)
   def zioProtocol = library(zio, zioStreams, zioJson)
