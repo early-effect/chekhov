@@ -121,4 +121,3 @@ object ChekhovConfigSpec extends ZIOSpecDefault:
         )
       }.provideLayer(ChekhovConfig.layer),
     ) @@ TestAspect.timeout(10.seconds)
-end ChekhovConfigSpec

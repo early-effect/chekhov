@@ -17,6 +17,7 @@ trait ChannelConnection:
 
   /** Await a channel object's `__create__` initializer (by guid). */
   def awaitInitializer(guid: String)(using Trace): IO[ChekhovError, Json]
+end ChannelConnection
 
 object ChannelConnection:
 
@@ -82,6 +83,7 @@ object ChannelConnection:
         }
 
       loop.timeoutFail(ChekhovError.Protocol(s"Timed out waiting for __create__ of $guid"))(8.seconds)
+    end awaitInitializer
 
   end Live
 

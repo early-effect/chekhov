@@ -39,4 +39,3 @@ object InboundMessage:
       case _ =>
         Left(s"Unrecognized inbound message: $json")
   }
-end InboundMessage

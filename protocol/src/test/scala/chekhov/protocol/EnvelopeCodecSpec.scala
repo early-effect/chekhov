@@ -35,4 +35,3 @@ object EnvelopeCodecSpec extends ZIOSpecDefault:
         assertTrue(g.toJson.contains("example.com"))
       },
     ) @@ TestAspect.timeout(10.seconds)
-end EnvelopeCodecSpec

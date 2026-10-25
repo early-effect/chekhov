@@ -48,7 +48,6 @@ object AscentFixtureSpec extends ZIOSpecDefault:
         case false => ZIO.sleep(250.millis) *> loop
       }
     loop.timeoutFail(ChekhovError.Timeout(timeoutMsg))(timeout)
-  end waitForTrue
 
   private def runOn(browser: ChekhovBrowser) =
     test(s"${browser.channelName}: increment counter") {

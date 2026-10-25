@@ -57,7 +57,6 @@ private[jsenv] final class BrowserRunner(
     )
     thread.setDaemon(true)
     thread.start()
-  end start
 
   private def runBlocking(inputs: Seq[Input]): Unit =
     val materialized = HtmlMaterializer.materialize(inputs)
@@ -114,7 +113,6 @@ private[jsenv] final class BrowserRunner(
       try errPs.close()
       catch case NonFatal(_) => ()
       closed.set(true)
-    end try
   end runBlocking
 
   private def pollLoop(

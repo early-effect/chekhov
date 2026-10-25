@@ -42,7 +42,6 @@ object BuildSite extends DocsSite:
           )
         ),
       )
-  end site
 
   override def layers: ZLayer[Any, Nothing, SiteBuilder] =
     EarlyEffectTheme.layers
@@ -58,5 +57,4 @@ object BuildSite extends DocsSite:
         SiteError.WriteFailed(index, err)
       }
     promote *> EarlyEffectTheme.writeLogo(out)
-  end afterBuild
 end BuildSite

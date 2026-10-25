@@ -20,6 +20,7 @@ enum WebStorageKind:
     this match
       case Local   => "local"
       case Session => "session"
+end WebStorageKind
 
 /** One localStorage / sessionStorage entry. */
 final case class StorageItem(name: String, value: String)
@@ -60,6 +61,7 @@ object BrowserType:
 
   def name(using Trace): URIO[BrowserType, String] =
     ZIO.serviceWith[BrowserType](_.name)
+end BrowserType
 
 trait Browser:
   def newContext(using Trace): ZIO[Scope & ChekhovConfig & ArtifactSession, ChekhovError, BrowserContext]
@@ -71,6 +73,7 @@ object Browser:
 
   def close(using Trace): ZIO[Browser, ChekhovError, Unit] =
     ZIO.serviceWithZIO[Browser](_.close)
+end Browser
 
 trait BrowserContext:
   def newPage(using Trace): ZIO[Scope, ChekhovError, Page]

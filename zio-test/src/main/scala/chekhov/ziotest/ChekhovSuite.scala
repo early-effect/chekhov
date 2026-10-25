@@ -68,7 +68,6 @@ object ChekhovSuite:
         }
         if parts.tail.isEmpty then parts.head
         else suite("chekhov")(parts*)
-      end some
 
   /** A ChekhovSuite's aspects, around `browsers`, the aspect that builds the stack its tests share. They fold in order,
     * so each wraps the ones before it: `withLiveClock` comes last so the shared stack is built on the live clock, and

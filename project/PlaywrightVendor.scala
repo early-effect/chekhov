@@ -59,7 +59,6 @@ object PlaywrightVendor:
     writeGeneratedFromYaml(paths.protocolYml, paths.protocolMeta.getParentFile)
     if installBrowsers then run(paths.base, "bash", "./scripts/install-browsers.sh")
     println(s"[chekhov] Playwright $v vendored. Review protocol diffs, then run tests.")
-  end bump
 
   /** Download + merge protocol YAML for `version` into `dest`. */
   def vendorProtocol(version: String, dest: File): Unit =
@@ -80,7 +79,6 @@ object PlaywrightVendor:
     Files.createDirectories(dest.toPath.getParent)
     Files.writeString(dest.toPath, header + body, StandardCharsets.UTF_8)
     println(s"[chekhov] wrote ${dest.getPath} (${body.linesIterator.size} lines of protocol)")
-  end vendorProtocol
 
   /** Regenerate ProtocolMeta only from the on-disk protocol.yml. */
   def writeProtocolMeta(version: String, yml: File, out: File): Unit =
@@ -122,8 +120,6 @@ object PlaywrightVendor:
         }
         Some(parts.mkString("\n"))
     catch case _: Throwable => None
-    end try
-  end fetchMergedSpecYaml
 
   private def fetchLegacyProtocolYaml(tag: String): Option[String] =
     val url =
@@ -159,7 +155,6 @@ object PlaywrightVendor:
     val resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
     if resp.statusCode() / 100 != 2 then sys.error(s"HTTP ${resp.statusCode()} for $url")
     resp.body()
-  end httpGetString
 
   private def run(cwd: File, cmd: String*): Unit =
     val pb = new ProcessBuilder(cmd*)

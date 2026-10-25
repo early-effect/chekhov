@@ -12,6 +12,7 @@ enum ChekhovBrowser:
     case Chromium => "chromium"
     case Firefox  => "firefox"
     case WebKit   => "webkit"
+end ChekhovBrowser
 
 object ChekhovBrowser:
   def fromString(s: String): Option[ChekhovBrowser] =

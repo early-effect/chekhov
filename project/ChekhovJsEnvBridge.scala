@@ -36,14 +36,13 @@ final class ChekhovJsEnvBridge(classpathFile: File) extends JSEnv:
     // Child-first: sbt plugins (sbt-specular / specular-site) still put zio-json 0.10 on the parent
     // loader. jsenv is compiled against 1.1.0; parent-first then NCDFE Magnolia / JsonEncoderDerivation
     // and the Scala.js adapter only sees RunTerminatedException.
-    val cl     = new ChildFirstURLClassLoader(urls.toArray, parent)
+    val cl = new ChildFirstURLClassLoader(urls.toArray, parent)
     try
       val module = Class.forName("chekhov.jsenv.ChekhovJSEnv$", true, cl).getField("MODULE$").get(null)
       module.getClass.getMethod("create").invoke(module).asInstanceOf[JSEnv]
     catch
       case NonFatal(e) =>
         throw new IllegalStateException(s"Failed to load ChekhovJSEnv from $classpathFile", e)
-  end load
 
   private def readClasspath(path: Path): Seq[URL] =
     val raw = Files.readString(path, StandardCharsets.UTF_8).trim
@@ -70,7 +69,6 @@ private final class ChildFirstURLClassLoader(urls: Array[URL], parent: ClassLoad
           catch case _: ClassNotFoundException => super.loadClass(name, false)
       if resolve then resolveClass(cls)
       cls
-end ChildFirstURLClassLoader
 
 private object ChildFirstURLClassLoader:
   private val ParentFirst =
@@ -88,4 +86,3 @@ object ChekhovJsEnvBridge:
       JSRun.failed(new RuntimeException(name))
     def startWithCom(input: Seq[Input], runConfig: RunConfig, onMessage: String => Unit): JSComRun =
       JSComRun.failed(new RuntimeException(name))
-end ChekhovJsEnvBridge
