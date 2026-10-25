@@ -42,7 +42,6 @@ object StaticFileServer:
                   ex.getResponseHeaders.add("Access-Control-Allow-Origin", "*")
                   ex.sendResponseHeaders(200, bytes.length)
                   ex.getResponseBody.write(bytes)
-                end if
                 ex.close(),
             )
             server.setExecutor(null)

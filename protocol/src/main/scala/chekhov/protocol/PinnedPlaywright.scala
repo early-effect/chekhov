@@ -85,8 +85,6 @@ object PinnedPlaywright:
                   (prob.orElse(Some(problem)), None)
           }
         found.map(Right(_)).getOrElse(Left(firstProblem.getOrElse(Problem.Missing)))
-    end match
-  end resolve
 
   /** Fail if the pin's browser revision is not in the Playwright cache. */
   def requireBrowser(browser: ChekhovBrowser, lookup: Lookup = Lookup.system): Either[Problem, Unit] =
@@ -119,7 +117,6 @@ object PinnedPlaywright:
         cli <- ensurePinnedCli(lookup, log)
         _   <- installBrowsers(lookup, node, cli, browsers, log)
       yield cli
-  end install
 
   def cacheRoot(lookup: Lookup = Lookup.system): Path =
     lookup.env.get("CHEKHOV_CACHE") match
@@ -296,8 +293,6 @@ object PinnedPlaywright:
         if Files.isRegularFile(installed) then Right(installed)
         else Left(s"chekhov: npm install playwright@$version did not produce $installed")
       }
-    end if
-  end downloadPinned
 
   private def installBrowsers(
       lookup: Lookup,
@@ -318,7 +313,6 @@ object PinnedPlaywright:
       log(s"chekhov: installing ${names.mkString(", ")} for Playwright $version")
       run(lookup.cwd, log, env, node :: cli.toString :: "install" :: names)
     }
-  end installBrowsers
 
   private def sanitizedBrowserEnv(lookup: Lookup): Map[String, String] =
     lookup.env.get("PLAYWRIGHT_BROWSERS_PATH") match
@@ -344,8 +338,6 @@ object PinnedPlaywright:
         Left(
           s"chekhov: $label is required to install Playwright $version. Install Node 20+ and run `sbt chekhovInstall`."
         )
-    end try
-  end ensureCommand
 
   private def run(cwd: Path, log: String => Unit, cmd: String*): Either[String, Unit] =
     run(cwd, log, sys.env, cmd.toList)
@@ -371,7 +363,5 @@ object PinnedPlaywright:
     catch
       case e: Exception =>
         Left(s"chekhov: failed to run ${cmd.mkString(" ")}: ${e.getMessage}")
-    end try
-  end run
 
 end PinnedPlaywright

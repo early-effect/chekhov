@@ -77,4 +77,3 @@ object ProtocolMeta:
     "Worker",
     "WritableStream",
   )
-end ProtocolMeta

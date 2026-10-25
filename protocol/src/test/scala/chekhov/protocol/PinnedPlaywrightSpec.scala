@@ -199,7 +199,6 @@ object PinnedPlaywrightSpec extends ZIOSpecDefault:
     val work = if cwd == null then tmp.resolve("empty-project") else cwd
     Files.createDirectories(work)
     PinnedPlaywright.Lookup(env = env, cwd = work, userHome = home)
-  end lookupAt
 
   private def writeCli(root: Path, version: String): Path =
     val pkgDir = root.resolve("node_modules").resolve("playwright")
@@ -212,7 +211,6 @@ object PinnedPlaywrightSpec extends ZIOSpecDefault:
     val cli = pkgDir.resolve("cli.js")
     Files.writeString(cli, "#!/usr/bin/env node\n", StandardCharsets.UTF_8)
     cli
-  end writeCli
 
   private def writeBrowsersJson(cli: Path, browser: ChekhovBrowser, revision: String): Unit =
     val core = cli.getParent.getParent.resolve("playwright-core")

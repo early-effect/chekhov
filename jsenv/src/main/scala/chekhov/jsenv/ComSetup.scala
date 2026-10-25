@@ -60,4 +60,3 @@ object ComSetup:
       |  };
       |})();
       |""".stripMargin
-end ComSetup

@@ -184,7 +184,6 @@ object ProtocolCodegen:
        |    commands.getOrElse(channel, Set.empty).contains(method)
        |end ProtocolSurface
        |""".stripMargin
-  end generateSurface
 
   private def commandNames(types: Map[String, Any], typeName: String): List[String] =
     types.get(typeName) match
@@ -298,8 +297,6 @@ object ProtocolCodegen:
          |  ) derives JsonCodec
          |
          |""".stripMargin
-    end if
-  end renderCommand
 
   /** Raw parameter map for a channel method (may include `$mixin`). */
   private def methodParameters(
@@ -324,7 +321,6 @@ object ProtocolCodegen:
                 sys.error(s"protocol.yml missing $channel.$method")
           case _ =>
             sys.error(s"protocol.yml $channel has no commands")
-        end match
       case _ =>
         sys.error(s"protocol.yml missing channel $channel")
 
@@ -394,7 +390,6 @@ object ProtocolCodegen:
               buf ++= fields.mkString(",\n")
               buf ++= s"\n) derives JsonCodec\n\n"
             case _ => ()
-          end match
         case _ => ()
       }
     }
@@ -446,7 +441,6 @@ object ProtocolCodegen:
           case Some(_)                                      => ("Json", false)
           case None                                         =>
             ("Json", true)
-        end match
       case _ => ("Json", true)
 
   private def mapNamed(types: Map[String, Any], raw: String): String =

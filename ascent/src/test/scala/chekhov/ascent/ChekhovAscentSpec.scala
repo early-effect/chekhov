@@ -98,7 +98,6 @@ object ChekhovAscentSpec extends ZIOSpecDefault:
           a.forall(!_.isConnected),
           b.forall(!_.isConnected),
         )
-        end for
       },
     )
 

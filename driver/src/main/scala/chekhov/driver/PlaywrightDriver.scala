@@ -46,7 +46,6 @@ object PlaywrightDriver:
         else None,
       env = Option.when(needed.nonEmpty)(nameValues(inherited ++ needed)),
     )
-  end launchParams
 
   /** Playwright's `NameValue[]`, sorted so the request is the same for the same environment. */
   private def nameValues(env: Map[String, String]): Json =
@@ -251,7 +250,6 @@ object PlaywrightDriver:
         .map { result =>
           result.asObject.flatMap(_.get("value")).getOrElse(result).toJson
         }
-    end evaluate
 
     def webStorageItems(kind: WebStorageKind)(using Trace): IO[ChekhovError, Chunk[StorageItem]] =
       conn
@@ -427,8 +425,6 @@ object PlaywrightDriver:
                         )
                       }
                     finally stream.close()
-                    end try
-                  end if
                   deleteRecursively(dir)
                 }
                 .mapError(e => ChekhovError.Driver(s"Failed to promote video dir $dir: $e", Some(e)))
@@ -529,7 +525,6 @@ object PlaywrightDriver:
           .orElseFail(ChekhovError.Protocol(s"Invalid cookie: $item"))
       }
       .map(Chunk.fromIterable)
-  end decodeCookies
 
   private def decodeStorageItems(json: Json): IO[ChekhovError, Chunk[StorageItem]] =
     val arr = json.asObject.flatMap(_.get("items")).flatMap(_.asArray).getOrElse(Chunk.empty)
@@ -546,7 +541,6 @@ object PlaywrightDriver:
           .orElseFail(ChekhovError.Protocol(s"Invalid storage item: $item"))
       }
       .map(Chunk.fromIterable)
-  end decodeStorageItems
 
   def browserType(using Trace): ZIO[ChannelConnection & ChekhovConfig, ChekhovError, BrowserType] =
     for

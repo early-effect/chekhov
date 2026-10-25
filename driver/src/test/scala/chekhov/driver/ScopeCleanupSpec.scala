@@ -47,7 +47,6 @@ object ScopeCleanupSpec extends ZIOSpecDefault:
         ran  <- started.await
         left <- survivors(ran)
       yield assertTrue(ran.nonEmpty, left.isEmpty)
-      end for
     }
 
   private def interrupted(browser: ChekhovBrowser) =
@@ -66,7 +65,6 @@ object ScopeCleanupSpec extends ZIOSpecDefault:
         _    <- fiber.interrupt
         left <- survivors(ran)
       yield assertTrue(ran.nonEmpty, left.isEmpty)
-      end for
     }
 
   /** Firefox's app data where macOS 27 guards it with `com.apple.macl`, so its launch never answers (Mozilla 2060476).
@@ -91,7 +89,6 @@ object ScopeCleanupSpec extends ZIOSpecDefault:
         ran    <- seen.get
         left   <- survivors(ran)
       yield assertTrue(result.isLeft, ran.nonEmpty, left.isEmpty)
-      end for
     } @@ TestAspect.ifProp("os.name")(_.startsWith("Mac"))
 
   def spec =
