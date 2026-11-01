@@ -2,5 +2,5 @@
 addSbtPlugin("rocks.earlyeffect" % "sbt-zipx" % "0.19.1")
 addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.22.0")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.6.2")
-addSbtPlugin("rocks.earlyeffect" % "sbt-specular" % "0.20.0")
+addSbtPlugin("rocks.earlyeffect" % "sbt-specular" % "0.21.1")
 addSbtPlugin("rocks.earlyeffect" % "sbt-splice" % "0.3.2")
